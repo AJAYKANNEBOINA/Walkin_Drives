@@ -126,7 +126,7 @@ export async function postDrive(payload: PostDrivePayload, userId: string): Prom
   // Try to find existing company first, then insert if not found
   let companyId: string
 
-  const { data: existing } = await supabase
+  const { data: existing } = await db
     .from('companies')
     .select('id')
     .ilike('name', payload.company)

@@ -13,6 +13,7 @@ export interface Database {
           avatar_url: string | null
           resume_url: string | null
           skills: string[] | null
+          is_admin: boolean
           created_at: string
           updated_at: string
         }
@@ -25,6 +26,7 @@ export interface Database {
           avatar_url?: string | null
           resume_url?: string | null
           skills?: string[] | null
+          is_admin?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -36,6 +38,7 @@ export interface Database {
           avatar_url?: string | null
           resume_url?: string | null
           skills?: string[] | null
+          is_admin?: boolean
           updated_at?: string
         }
         Relationships: []
