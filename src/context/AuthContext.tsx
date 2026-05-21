@@ -23,7 +23,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function fetchIsAdmin(userId: string) {
     if (!isConfigured) return false
-    const { data, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
       .from('profiles')
       .select('is_admin')
       .eq('id', userId)
