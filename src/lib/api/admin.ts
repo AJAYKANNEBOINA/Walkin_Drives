@@ -1,4 +1,7 @@
-import { supabase } from '@/lib/supabase'
+import {
+  collection, doc, getDocs, updateDoc, deleteDoc,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 import { sendJobAlertEmails } from '@/lib/api/alerts'
 
 export type DriveStatus = 'pending' | 'approved' | 'rejected'
@@ -25,60 +28,63 @@ export interface AdminDrive {
   company: { id: string; name: string; industry: string | null }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as any
-
 export async function fetchAdminDrives(status?: DriveStatus): Promise<AdminDrive[]> {
-  let q = db
-    .from('drives')
-    .select('*, company:companies(id, name, industry)')
-    .order('created_at', { ascending: false })
+  // Fetch all drives, filter + sort client-side to avoid composite index requirement
+  const snap = await getDocs(collection(db, 'drives'))
 
-  if (status) q = q.eq('status', status)
-
-  const { data, error } = await q
-  if (error) {
-    console.error('fetchAdminDrives error:', error)
-    throw error
-  }
-  return data as AdminDrive[]
+  return snap.docs
+    .map(d => {
+    const data = d.data()
+    return {
+      id:            d.id,
+      role:          data.role,
+      location:      data.location,
+      city:          data.city,
+      experience:    data.experience,
+      salary:        data.salary ?? null,
+      mode:          data.mode,
+      drive_date:    data.drive_date,
+      drive_time:    data.drive_time,
+      status:        data.status,
+      is_active:     data.is_active,
+      is_priority:   data.is_priority,
+      contact_email: data.contact_email ?? null,
+      posted_by:     data.posted_by ?? null,
+      created_at:    data.created_at,
+      openings:      data.openings ?? null,
+      description:   data.description ?? null,
+      skills:        data.skills ?? null,
+      company: {
+        id:       data.company_id,
+        name:     data.company_name,
+        industry: data.company_industry ?? null,
+      },
+    } as AdminDrive
+    })
+    .filter(d => !status || d.status === status)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
 }
 
 export async function approveDrive(id: string): Promise<void> {
-  const { error } = await db
-    .from('drives')
-    .update({ status: 'approved', is_active: true })
-    .eq('id', id)
-  if (error) throw error
+  await updateDoc(doc(db, 'drives', id), { status: 'approved', is_active: true })
 
-  // Fire-and-forget: send email alerts to matching subscribers
-  sendJobAlertEmails(id).catch((err) =>
+  sendJobAlertEmails(id).catch(err =>
     console.error('sendJobAlertEmails failed:', err)
   )
 }
 
 export async function rejectDrive(id: string): Promise<void> {
-  const { error } = await db
-    .from('drives')
-    .update({ status: 'rejected', is_active: false })
-    .eq('id', id)
-  if (error) throw error
+  await updateDoc(doc(db, 'drives', id), { status: 'rejected', is_active: false })
 }
 
 export async function deleteDrive(id: string): Promise<void> {
-  const { error } = await db.from('drives').delete().eq('id', id)
-  if (error) throw error
+  await deleteDoc(doc(db, 'drives', id))
 }
 
 export async function fetchAdminStats() {
-  const { data, error } = await db
-    .from('drives')
-    .select('status, is_active, drive_date')
-
-  if (error) throw error
-
+  const snap = await getDocs(collection(db, 'drives'))
   const today = new Date().toISOString().split('T')[0]
-  const rows = data as { status: string; is_active: boolean; drive_date: string }[]
+  const rows = snap.docs.map(d => d.data() as { status: string; is_active: boolean; drive_date: string })
 
   return {
     pending:  rows.filter(r => r.status === 'pending').length,

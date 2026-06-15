@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   Briefcase, Bell, CheckCircle2, TrendingUp, Clock, ArrowRight,
   User, FileText, Settings, LogOut, MapPin, LayoutDashboard,
@@ -8,11 +8,9 @@ import {
 } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { DriveCard } from '@/components/drives/DriveCard'
 import { StatusBadge } from '@/components/ui/Badge'
 import { CompanyLogo } from '@/components/ui/CompanyLogo'
 import { useAuth } from '@/context/AuthContext'
-import { useDrives } from '@/hooks/useDrives'
 import { useApplications } from '@/hooks/useApplications'
 import {
   useAdminDrives, useAdminStats,
@@ -22,11 +20,11 @@ import type { AdminDrive } from '@/lib/api/admin'
 
 export default function Dashboard() {
   const { user, isAdmin, signOut } = useAuth()
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
+  const location  = useLocation()
 
   // User data
-  const { data: applications = [] } = useApplications(user?.id)
-  const { data: drives = [] }       = useDrives({ enabled: !isAdmin })
+  const { data: applications = [] } = useApplications(user?.uid)
 
   // Admin data
   const { data: pendingDrives = [], isLoading: pendingLoading } = useAdminDrives('pending',  isAdmin)
@@ -51,18 +49,15 @@ export default function Dashboard() {
     )
   }
 
-  const userName = user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'there'
+  const userName = user.displayName ?? user.email?.split('@')[0] ?? 'there'
 
   // ── User stats ──
   const userStats = [
-    { label: 'Total Applied',   value: applications.length,                                              icon: Briefcase,    accent: 'from-blue-500/15 to-blue-500/0' },
-    { label: 'Shortlisted',     value: applications.filter((a) => a.status === 'shortlisted').length,    icon: TrendingUp,   accent: 'from-amber-400/20 to-amber-400/0' },
-    { label: 'Selected',        value: applications.filter((a) => a.status === 'selected').length,       icon: CheckCircle2, accent: 'from-emerald-500/15 to-emerald-500/0' },
-    { label: 'Upcoming Drives', value: drives.filter((d) => new Date(d.drive_date) >= new Date()).length, icon: Clock,        accent: 'from-violet-500/15 to-violet-500/0' },
+    { label: 'Total Applied',   value: applications.length,                                               icon: Briefcase,    accent: 'from-brand-blue/10 to-brand-blue/0' },
+    { label: 'Shortlisted',     value: applications.filter((a) => a.status === 'shortlisted').length,    icon: TrendingUp,   accent: 'from-brand-blue/8 to-brand-blue/0'  },
+    { label: 'Selected',        value: applications.filter((a) => a.status === 'selected').length,       icon: CheckCircle2, accent: 'from-brand-blue/10 to-brand-blue/0' },
+    { label: 'Pending',         value: applications.filter((a) => a.status === 'applied').length,          icon: Clock,        accent: 'from-brand-blue/8 to-brand-blue/0'  },
   ]
-
-  const appliedIds   = new Set(applications.map((a) => a.drive.id))
-  const recommended  = drives.filter((d) => !appliedIds.has(d.id)).slice(0, 4)
 
   // ── Tab drive list ──
   const tabDrives =
@@ -74,17 +69,17 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       <main className="flex-1">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid lg:grid-cols-[240px_1fr] gap-8">
+        <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-5 sm:py-8">
+          <div className="grid md:grid-cols-[220px_1fr] gap-6">
 
             {/* ── Sidebar ── */}
             <aside className="space-y-4">
               {/* Profile card */}
               <div className="rounded-2xl border border-border bg-card p-5 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[oklch(0.62_0.22_260)] to-[oklch(0.55_0.22_260)] text-primary-foreground text-2xl font-bold shadow-[0_8px_20px_-8px_oklch(0.62_0.22_260/0.6)] mb-3">
+                <div className="mx-auto flex h-14 w-14 md:h-16 md:w-16 items-center justify-center rounded-full bg-gradient-to-br from-[oklch(0.62_0.22_260)] to-[oklch(0.55_0.22_260)] text-primary-foreground text-xl md:text-2xl font-bold shadow-[0_8px_20px_-8px_oklch(0.62_0.22_260/0.6)] mb-3">
                   {(userName as string)[0].toUpperCase()}
                 </div>
-                <p className="font-semibold text-foreground capitalize">{userName}</p>
+                <p className="font-semibold text-foreground capitalize truncate">{userName}</p>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">{user.email}</p>
                 {isAdmin && (
                   <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-brand-blue/10 px-2.5 py-0.5 text-[10px] font-bold text-brand-blue">
@@ -137,19 +132,22 @@ export default function Dashboard() {
                   /* User nav */
                   <>
                     {[
-                      { icon: LayoutDashboard, label: 'Dashboard',    active: true  },
-                      { icon: Briefcase,       label: 'Applications', active: false },
-                      { icon: Bell,            label: 'Job Alerts',   active: false },
-                      { icon: User,            label: 'My Profile',   active: false },
-                      { icon: FileText,        label: 'My Resume',    active: false },
-                      { icon: Settings,        label: 'Settings',     active: false },
-                    ].map(({ icon: Icon, label, active }) => (
-                      <button
+                      { icon: LayoutDashboard, label: 'Dashboard',   to: '/dashboard'  },
+                      { icon: Bell,            label: 'Job Alerts',  to: '/job-alerts' },
+                      { icon: User,            label: 'My Profile',  to: '/profile'    },
+                      { icon: FileText,        label: 'Blog',        to: '/blogs'      },
+                    ].map(({ icon: Icon, label, to }) => (
+                      <Link
                         key={label}
-                        className={`flex w-full items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${active ? 'bg-brand-blue/10 text-brand-blue border-l-2 border-brand-blue' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}
+                        to={to}
+                        className={`flex w-full items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                          location.pathname === to
+                            ? 'bg-brand-blue/10 text-brand-blue border-l-2 border-brand-blue'
+                            : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                        }`}
                       >
                         <Icon className="h-4 w-4" />{label}
-                      </button>
+                      </Link>
                     ))}
                   </>
                 )}
@@ -166,14 +164,14 @@ export default function Dashboard() {
             <div className="space-y-6">
 
               {/* Welcome banner */}
-              <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-[oklch(0.18_0.04_260)] via-[oklch(0.22_0.06_260)] to-[oklch(0.16_0.04_260)] p-6 shadow-[0_10px_30px_-10px_oklch(0.62_0.22_260/0.5)]">
+              <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-[oklch(0.18_0.04_260)] via-[oklch(0.22_0.06_260)] to-[oklch(0.16_0.04_260)] p-5 sm:p-6 shadow-[0_10px_30px_-10px_oklch(0.62_0.22_260/0.5)]">
                 <div aria-hidden className="pointer-events-none absolute -top-12 -right-12 h-48 w-48 rounded-full bg-[oklch(0.62_0.22_260/0.3)] blur-3xl" />
                 <div aria-hidden className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-[oklch(0.84_0.17_85/0.15)] blur-3xl" />
                 <div className="relative">
                   <p className="text-sm font-medium text-white/60">
                     {isAdmin ? '🛡️ Admin View' : 'Good to see you 👋'}
                   </p>
-                  <h1 className="text-2xl font-bold text-white mt-1 capitalize">
+                  <h1 className="text-xl sm:text-2xl font-bold text-white mt-1 capitalize">
                     Welcome back, {userName}!
                   </h1>
                   <p className="text-white/60 text-sm mt-1.5">
@@ -202,25 +200,24 @@ export default function Dashboard() {
               {isAdmin && (
                 <>
                   {/* Admin stat cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     {[
-                      { label: 'Pending Review', value: adminStats?.pending  ?? 0, icon: Clock,        accent: 'from-amber-400/20 to-amber-400/0',    iconColor: 'text-amber-500'   },
-                      { label: 'Approved',        value: adminStats?.approved ?? 0, icon: CheckCircle2, accent: 'from-emerald-500/15 to-emerald-500/0', iconColor: 'text-emerald-500' },
-                      { label: 'Rejected',        value: adminStats?.rejected ?? 0, icon: XCircle,      accent: 'from-red-500/15 to-red-500/0',         iconColor: 'text-red-500'     },
-                      { label: 'Total Drives',    value: adminStats?.total    ?? 0, icon: BarChart3,     accent: 'from-blue-500/15 to-blue-500/0',        iconColor: 'text-brand-blue'  },
+                      { label: 'Pending Review', value: adminStats?.pending  ?? 0, icon: Clock,        accent: 'from-brand-blue/8 to-brand-blue/0',  iconColor: 'text-brand-blue' },
+                      { label: 'Approved',        value: adminStats?.approved ?? 0, icon: CheckCircle2, accent: 'from-brand-blue/6 to-brand-blue/0',  iconColor: 'text-brand-blue' },
+                      { label: 'Rejected',        value: adminStats?.rejected ?? 0, icon: XCircle,      accent: 'from-brand-blue/8 to-brand-blue/0',  iconColor: 'text-red-500'    },
+                      { label: 'Total Drives',    value: adminStats?.total    ?? 0, icon: BarChart3,     accent: 'from-brand-blue/10 to-brand-blue/0', iconColor: 'text-brand-blue' },
                     ].map(({ label, value, icon: Icon, accent, iconColor }) => (
-                      <div key={label} className={`group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-0.5`}>
+                      <div key={label} className={`group relative overflow-hidden rounded-2xl border border-border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5`}>
                         <div className={`pointer-events-none absolute -top-10 -right-10 h-28 w-28 rounded-full bg-gradient-to-br ${accent} blur-2xl opacity-80`} />
                         <div className="relative">
-                          <Icon className={`h-5 w-5 ${iconColor} mb-3`} />
-                          <p className="text-3xl font-bold text-foreground tracking-tight">{value}</p>
-                          <p className="mt-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+                          <Icon className={`h-4 w-4 ${iconColor} mb-2`} />
+                          <p className="text-2xl font-bold text-foreground tracking-tight">{value}</p>
+                          <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Drives table with tabs */}
                   <div className="rounded-2xl border border-border bg-card overflow-hidden">
                     {/* Tab bar */}
                     <div className="flex items-center gap-1 border-b border-border px-4 pt-4 pb-0">
@@ -291,16 +288,16 @@ export default function Dashboard() {
               {!isAdmin && (
                 <>
                   {/* Stats */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     {userStats.map(({ label, value, icon: Icon, accent }) => (
-                      <div key={label} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-blue/40 hover:shadow-[0_10px_30px_-10px_oklch(0.62_0.22_260/0.2)]">
+                      <div key={label} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-blue/40 hover:shadow-[0_10px_30px_-10px_oklch(0.62_0.22_260/0.2)]">
                         <div className={`pointer-events-none absolute -top-10 -right-10 h-28 w-28 rounded-full bg-gradient-to-br ${accent} blur-2xl opacity-80`} />
                         <div className="relative">
-                          <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[oklch(0.62_0.22_260)] to-[oklch(0.55_0.22_260)] text-primary-foreground shadow-[0_8px_20px_-8px_oklch(0.62_0.22_260/0.5)] ring-1 ring-white/10 mb-3">
-                            <Icon className="h-5 w-5" />
+                          <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-[oklch(0.62_0.22_260)] to-[oklch(0.55_0.22_260)] text-primary-foreground shadow-[0_8px_20px_-8px_oklch(0.62_0.22_260/0.5)] ring-1 ring-white/10 mb-2">
+                            <Icon className="h-4 w-4" />
                           </span>
-                          <p className="text-3xl font-bold text-foreground tracking-tight">{value}</p>
-                          <p className="mt-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+                          <p className="text-2xl font-bold text-foreground tracking-tight">{value}</p>
+                          <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
                         </div>
                       </div>
                     ))}
@@ -314,13 +311,22 @@ export default function Dashboard() {
                     </div>
                     <div className="divide-y divide-border">
                       {applications.length === 0 ? (
-                        <p className="px-6 py-8 text-sm text-center text-muted-foreground">
-                          No applications yet. <Link to="/drives" className="text-brand-blue font-semibold hover:underline">Browse drives →</Link>
-                        </p>
+                        <div className="flex flex-col items-center justify-center py-14 px-6 text-center">
+                          <div className="h-16 w-16 rounded-2xl bg-[oklch(0.965_0.007_252)] border border-border flex items-center justify-center mb-4">
+                            <Briefcase className="h-7 w-7 text-muted-foreground" />
+                          </div>
+                          <p className="font-semibold text-foreground text-sm">No applications yet</p>
+                          <p className="text-xs text-muted-foreground mt-1.5 max-w-xs leading-relaxed">
+                            Find a walk-in drive near you and apply in one click. Same-day results, no waiting.
+                          </p>
+                          <Link to="/drives" className="mt-5 inline-flex items-center gap-2 rounded-full bg-brand-blue px-5 py-2.5 text-xs font-semibold text-white hover:bg-[oklch(0.56_0.22_262)] transition-colors">
+                            Browse Walk-in Drives <ArrowRight className="h-3.5 w-3.5" />
+                          </Link>
+                        </div>
                       ) : applications.map((app) => {
                         const driveDate = new Date(app.drive.drive_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
                         return (
-                          <div key={app.id} className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-secondary/50 transition-colors">
+                          <div key={app.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 px-4 sm:px-6 py-4 hover:bg-secondary/50 transition-colors">
                             <div className="flex items-center gap-3 min-w-0">
                               <CompanyLogo name={app.drive.company.name} size="sm" />
                               <div className="min-w-0">
@@ -334,29 +340,13 @@ export default function Dashboard() {
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3 shrink-0">
+                            <div className="flex items-center gap-3 shrink-0 pl-11 sm:pl-0">
                               <StatusBadge status={app.status} />
                               <Link to={`/drives/${app.drive.id}`} className="text-xs text-muted-foreground hover:text-brand-blue font-medium transition-colors">View</Link>
                             </div>
                           </div>
                         )
                       })}
-                    </div>
-                  </div>
-
-                  {/* Recommended */}
-                  <div>
-                    <div className="flex items-center justify-between mb-5">
-                      <div>
-                        <p className="text-xs font-semibold tracking-widest text-muted-foreground">FOR YOU</p>
-                        <h2 className="mt-1 text-xl font-bold text-foreground">Recommended Drives</h2>
-                      </div>
-                      <Link to="/drives" className="text-sm font-semibold text-brand-blue hover:underline inline-flex items-center gap-1">
-                        See all <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {recommended.map((d) => <DriveCard key={d.id} drive={d} compact />)}
                     </div>
                   </div>
 
@@ -408,8 +398,8 @@ function PendingDriveRow({
   const isExpired = drive.drive_date < today
 
   return (
-    <div className="px-6 py-4 hover:bg-secondary/30 transition-colors">
-      <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+    <div className="px-4 sm:px-6 py-4 hover:bg-secondary/30 transition-colors">
+      <div className="flex flex-col gap-3">
 
         {/* Drive info */}
         <div className="flex-1 min-w-0">
@@ -450,7 +440,7 @@ function PendingDriveRow({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {activeTab === 'pending' && (
             <>
               <button onClick={onApprove} disabled={approving}

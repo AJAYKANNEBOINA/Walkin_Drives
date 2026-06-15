@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, MapPin, Calendar, Clock, Users, Star, CheckCircle2,
   Share2, Bookmark, ArrowRight, Loader2, Briefcase, BadgeCheck,
-  Facebook, Twitter, Linkedin, Mail, Building2, IndianRupee,
+  Facebook, Twitter, Linkedin, Mail, Building2, IndianRupee, Copy,
 } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
@@ -13,19 +14,20 @@ import { useDrive, useDrives } from '@/hooks/useDrives'
 import { useApply, useHasApplied } from '@/hooks/useApplications'
 
 const MODE_COLOR: Record<string, string> = {
-  Onsite: 'bg-blue-500/10 text-blue-600 border-blue-200',
-  Hybrid: 'bg-violet-500/10 text-violet-600 border-violet-200',
-  Remote: 'bg-emerald-500/10 text-emerald-600 border-emerald-200',
+  Onsite: 'bg-white/10 text-white/80 border-white/20',
+  Hybrid: 'bg-white/10 text-white/80 border-white/20',
+  Remote: 'bg-white/10 text-white/80 border-white/20',
 }
 
 export default function DriveDetail() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [applySuccess, setApplySuccess] = useState(false)
 
   const { data: drive, isLoading } = useDrive(id)
   const { data: allDrives = [] } = useDrives()
-  const { data: applied = false } = useHasApplied(id ?? '', user?.id)
+  const { data: applied = false } = useHasApplied(id ?? '', user?.uid)
   const applyMutation = useApply()
 
   const related = allDrives.filter((d) => d.id !== id && d.city === drive?.city).slice(0, 4)
@@ -53,11 +55,22 @@ export default function DriveDetail() {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   })
 
+  const today      = new Date().toISOString().split('T')[0]
+  const isExpired  = drive.drive_date < today
+  const [copied, setCopied] = useState(false)
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(shareUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   const handleApply = () => {
     if (!user) return navigate('/login')
     if (applied || applyMutation.isPending) return
-    applyMutation.mutate({ driveId: drive.id, userId: user.id })
-    alert('Application submitted! You will receive a confirmation on your registered email.')
+    applyMutation.mutate({ driveId: drive.id, userId: user.uid })
+    setApplySuccess(true)
+    setTimeout(() => setApplySuccess(false), 5000)
   }
 
   const shareUrl = window.location.href
@@ -65,6 +78,16 @@ export default function DriveDetail() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
+
+      {/* ── EXPIRED NOTICE ── */}
+      {isExpired && (
+        <div className="bg-[oklch(0.97_0.005_255)] border-b border-[oklch(0.905_0.01_255)]">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-2.5 text-sm text-[oklch(0.42_0.022_258)]">
+            <span className="text-base">⏰</span>
+            <span>This walk-in drive has already taken place on <strong>{formattedDate}</strong>. You can still view the details for reference.</span>
+          </div>
+        </div>
+      )}
 
       {/* ── HERO BANNER ── */}
       <div className="relative overflow-hidden bg-gradient-to-br from-[oklch(0.14_0.05_265)] via-[oklch(0.18_0.06_260)] to-[oklch(0.12_0.04_265)]">
@@ -247,22 +270,29 @@ export default function DriveDetail() {
               <div className="rounded-2xl border border-border bg-card px-7 py-5">
                 <p className="text-sm font-semibold text-foreground mb-3">Share this Drive</p>
                 <div className="flex flex-wrap gap-2">
+                  {/* WhatsApp */}
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(`${drive.role} at ${drive.company.name} – Walk-in Drive in ${drive.city}\n${shareUrl}`)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-[#25D366]/10 hover:border-[#25D366]/40 hover:text-[#25D366]"
+                  >
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                    WhatsApp
+                  </a>
                   {[
-                    { icon: Linkedin, label: 'LinkedIn',  href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, color: 'hover:bg-[#0077B5]/10 hover:border-[#0077B5]/30 hover:text-[#0077B5]' },
-                    { icon: Twitter,  label: 'X / Twitter', href: `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(drive.role + ' at ' + drive.company.name)}`, color: 'hover:bg-foreground/5 hover:border-foreground/20 hover:text-foreground' },
-                    { icon: Facebook, label: 'Facebook',  href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, color: 'hover:bg-[#1877F2]/10 hover:border-[#1877F2]/30 hover:text-[#1877F2]' },
-                    { icon: Mail,     label: 'Email',     href: `mailto:?subject=${encodeURIComponent(drive.role + ' – Walk-in Drive')}&body=${encodeURIComponent(shareUrl)}`, color: 'hover:bg-rose-500/10 hover:border-rose-300 hover:text-rose-600' },
+                    { icon: Linkedin, label: 'LinkedIn',    href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, color: 'hover:bg-[#0077B5]/10 hover:border-[#0077B5]/30 hover:text-[#0077B5]' },
+                    { icon: Twitter,  label: 'X',           href: `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(drive.role + ' at ' + drive.company.name)}`, color: 'hover:bg-foreground/5 hover:border-foreground/20 hover:text-foreground' },
+                    { icon: Mail,     label: 'Email',       href: `mailto:?subject=${encodeURIComponent(drive.role + ' – Walk-in Drive')}&body=${encodeURIComponent(shareUrl)}`, color: 'hover:bg-rose-500/10 hover:border-rose-300 hover:text-rose-600' },
                   ].map(({ icon: Icon, label, href, color }) => (
-                    <a
-                      key={label}
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors ${color}`}
-                    >
+                    <a key={label} href={href} target="_blank" rel="noopener noreferrer"
+                      className={`inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors ${color}`}>
                       <Icon className="h-3.5 w-3.5" /> {label}
                     </a>
                   ))}
+                  <button onClick={handleCopyLink}
+                    className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                    <Copy className="h-3.5 w-3.5" /> {copied ? 'Copied!' : 'Copy Link'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -281,6 +311,11 @@ export default function DriveDetail() {
                 )}
 
                 {/* Apply button */}
+                {isExpired ? (
+                  <div className="w-full rounded-full border border-[oklch(0.905_0.01_255)] bg-[oklch(0.97_0.005_255)] px-8 py-3.5 text-sm font-semibold text-[oklch(0.55_0.020_258)] text-center">
+                    ⏰ This drive has expired
+                  </div>
+                ) : (
                 <button
                   onClick={handleApply}
                   disabled={applied || applyMutation.isPending}
@@ -297,6 +332,13 @@ export default function DriveDetail() {
                     <>Login to Apply <ArrowRight className="h-4 w-4" /></>
                   )}
                 </button>
+                )}
+
+                {applySuccess && (
+                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700 text-center flex items-center justify-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" /> Application submitted successfully!
+                  </div>
+                )}
 
                 <p className="text-center text-xs text-muted-foreground -mt-1">
                   Walk in on {new Date(drive.drive_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · No appointment needed

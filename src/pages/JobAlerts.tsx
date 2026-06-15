@@ -13,7 +13,7 @@ import { CITIES, EXPERIENCES, MODES } from '@/lib/mockData'
 export default function JobAlerts() {
   const { user } = useAuth()
 
-  const { data: existing, isLoading } = useMyAlert(user?.id)
+  const { data: existing, isLoading } = useMyAlert(user?.uid)
   const save   = useSaveAlert()
   const remove = useDeleteAlert()
 
@@ -53,14 +53,14 @@ export default function JobAlerts() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
-    await save.mutateAsync({ payload: { email, cities, experience, mode, keywords }, userId: user.id })
+    await save.mutateAsync({ payload: { email, cities, experience, mode, keywords }, userId: user.uid })
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
 
   const handleDelete = async () => {
     if (!existing || !user) return
-    await remove.mutateAsync({ alertId: existing.id, userId: user.id })
+    await remove.mutateAsync({ alertId: existing.id, userId: user.uid })
   }
 
   if (!user) {

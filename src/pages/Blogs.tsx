@@ -1,161 +1,243 @@
-import { Eye, Share2, ArrowUpRight } from 'lucide-react'
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Clock, ChevronRight, Search, ArrowRight, BookOpen, TrendingUp, Briefcase, Users } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 
-type BlogPost = {
-  title: string
-  excerpt: string
-  url: string
+export interface BlogPost {
+  id:       string
+  title:    string
+  excerpt:  string
   category: string
-  date: string
-  cover: string
-  views: number
-  shares: number
+  author:   string
+  date:     string
+  readTime: number
+  image:    string
+  featured?: boolean
 }
 
-const blogPosts: BlogPost[] = [
+const CATEGORIES = ['All', 'Interview Tips', 'Career Advice', 'Resume', 'Salary', 'Companies']
+
+export const BLOG_POSTS: BlogPost[] = [
   {
-    title: 'How to Prepare for a Walk-In Interview',
-    excerpt: 'What to wear, what to carry, and the exact prep checklist trusted by lakhs of candidates across India.',
-    url: 'https://www.naukri.com/blog/how-to-prepare-for-a-walk-in-interview/',
-    category: 'Checklist',
-    date: '26 Jun 2025',
-    cover: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&auto=format&fit=crop&q=70',
-    views: 4596679,
-    shares: 1240,
+    id: '1', featured: true,
+    title:    'How to Crack a Walk-In Interview: Complete Guide for 2026',
+    excerpt:  "Walk-in interviews are your best shot at same-day hiring. Here's everything you need — what to carry, how to dress, and how to answer the most common HR questions.",
+    category: 'Interview Tips', author: 'Priya Sharma', date: '2026-06-01', readTime: 8,
+    image: 'https://images.unsplash.com/photo-1551836022-deb4988cc6c0?w=800&q=80',
   },
   {
-    title: 'Ace Your Next Walk-in Interview: Tips & Guide',
-    excerpt: 'An updated playbook on what walk-ins look like today and how to win them on the spot.',
-    url: 'https://internshala.com/blog/what-is-a-walk-in-interview/',
-    category: 'Guide',
-    date: '23 Apr 2025',
-    cover: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&auto=format&fit=crop&q=70',
-    views: 312770,
-    shares: 503,
+    id: '2', featured: true,
+    title:    'Top 10 Companies Hiring Freshers via Walk-In Drives in Bengaluru',
+    excerpt:  "Bengaluru remains India's top city for walk-in hiring. Genpact, Infosys BPM, Capgemini and 7 more are actively conducting drives for 2026 graduates.",
+    category: 'Companies', author: 'Rahul Verma', date: '2026-06-03', readTime: 5,
+    image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80',
   },
   {
-    title: 'Walk-in Interview Preparation Tips & Questions',
-    excerpt: 'Common questions asked at walk-ins along with sample answers and confidence boosters.',
-    url: 'https://www.foundit.in/career-advice/walk-in-interview/',
-    category: 'Q&A',
-    date: '29 Apr 2025',
-    cover: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&auto=format&fit=crop&q=70',
-    views: 78460,
-    shares: 167,
+    id: '3',
+    title:    'What Documents to Carry for a Walk-In Interview (Checklist)',
+    excerpt:  'Nothing is worse than reaching the venue and realising you forgot your PAN card. This checklist covers everything you need for BPO, IT and BFSI drives.',
+    category: 'Interview Tips', author: 'Sneha Pillai', date: '2026-06-05', readTime: 4,
+    image: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80',
   },
   {
-    title: 'Guide to Prepare for a Walk-in Job Interview',
-    excerpt: 'Meaning, tips and the end-to-end process of walk-in hiring explained for Indian job seekers.',
-    url: 'https://apna.co/career-central/tips-to-prepare-for-a-walk-in-interview-a-quick-guide/',
-    category: 'Process',
-    date: '13 Mar 2025',
-    cover: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&auto=format&fit=crop&q=70',
-    views: 156320,
-    shares: 289,
+    id: '4',
+    title:    'BPO vs IT Walk-In Drives: Which Should You Attend?',
+    excerpt:  'Both sectors are booming with walk-in opportunities, but they require very different skill sets and offer very different career trajectories.',
+    category: 'Career Advice', author: 'Arjun Nair', date: '2026-06-07', readTime: 6,
+    image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80',
+  },
+  {
+    id: '5',
+    title:    'How to Write a Resume for a Walk-In Drive (With Template)',
+    excerpt:  'Your resume has 30 seconds to impress an HR manager. Learn what to include, what to remove, and how to format it for maximum impact.',
+    category: 'Resume', author: 'Meera Iyer', date: '2026-06-08', readTime: 7,
+    image: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=800&q=80',
+  },
+  {
+    id: '6',
+    title:    'Expected Salaries in Walk-In Drives 2026: City-wise Breakdown',
+    excerpt:  'We analysed 500+ walk-in drives to give you a realistic picture of what you can expect in Hyderabad, Mumbai, Chennai and Bengaluru.',
+    category: 'Salary', author: 'Vikram Rao', date: '2026-06-09', readTime: 6,
+    image: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=800&q=80',
+  },
+  {
+    id: '7',
+    title:    '5 Mistakes to Avoid at Your Next Walk-In Interview',
+    excerpt:  'Arriving late, skipping research, dressing incorrectly — these avoidable mistakes cost thousands of candidates their dream jobs every year.',
+    category: 'Interview Tips', author: 'Priya Sharma', date: '2026-06-10', readTime: 5,
+    image: 'https://images.unsplash.com/photo-1573497620053-ea5300f94f21?w=800&q=80',
+  },
+  {
+    id: '8',
+    title:    'How to Negotiate Salary at a Walk-In Interview',
+    excerpt:  "Most candidates accept the first number offered. Walk-in interviews do allow negotiation — here's exactly how to do it without losing the offer.",
+    category: 'Salary', author: 'Arjun Nair', date: '2026-06-11', readTime: 5,
+    image: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80',
   },
 ]
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'Freshers':       'bg-blue-500/10 text-blue-600',
-  'Checklist':      'bg-emerald-500/10 text-emerald-600',
-  'Guide':          'bg-amber-500/10 text-amber-600',
-  'Q&A':            'bg-rose-500/10 text-rose-600',
-  'Process':        'bg-cyan-500/10 text-cyan-600',
+const CAT_ICONS: Record<string, React.ReactNode> = {
+  'Interview Tips': <TrendingUp className="h-3.5 w-3.5" />,
+  'Career Advice':  <Briefcase  className="h-3.5 w-3.5" />,
+  'Resume':         <BookOpen   className="h-3.5 w-3.5" />,
+  'Salary':         <TrendingUp className="h-3.5 w-3.5" />,
+  'Companies':      <Users      className="h-3.5 w-3.5" />,
 }
 
-function formatCount(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`
-  return String(n)
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function BlogCard({ post }: { post: BlogPost }) {
-  const categoryStyle = CATEGORY_COLORS[post.category] ?? 'bg-secondary text-muted-foreground'
-
+function Avatar({ name }: { name: string }) {
   return (
-    <a
-      href={post.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group flex flex-col rounded-2xl border border-border bg-card overflow-hidden hover:border-brand-blue/40 hover:shadow-[0_10px_30px_-10px_oklch(0.62_0.22_260/0.2)] hover:-translate-y-0.5 transition-all duration-300"
-    >
-      {/* Cover image */}
-      <div className="relative overflow-hidden bg-secondary">
-        <img
-          src={post.cover}
-          alt={post.title}
-          loading="lazy"
-          className="w-full h-48 object-cover group-hover:scale-[1.03] transition-transform duration-500"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-        <span className={`absolute top-3 left-3 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${categoryStyle}`}>
-          {post.category}
-        </span>
-      </div>
+    <span className="h-5 w-5 rounded-full bg-brand-blue/10 text-brand-blue text-[9px] font-bold flex items-center justify-center shrink-0">
+      {name[0]}
+    </span>
+  )
+}
 
-      {/* Content */}
-      <div className="flex flex-col flex-1 p-5">
-        <p className="text-xs text-muted-foreground">{post.date}</p>
-
-        <h3 className="mt-1.5 text-base font-bold text-foreground leading-snug group-hover:text-brand-blue transition-colors">
-          {post.title}
-        </h3>
-
-        <p className="mt-2 text-sm text-muted-foreground line-clamp-3">
-          {post.excerpt}
-        </p>
-
-        {/* Footer row */}
-        <div className="mt-4 pt-4 border-t border-border/60 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Eye className="h-3.5 w-3.5" />
-              {formatCount(post.views)}
-            </span>
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Share2 className="h-3.5 w-3.5" />
-              {post.shares}
-            </span>
-            <span className="grid h-7 w-7 place-items-center rounded-full border border-border text-muted-foreground group-hover:border-brand-blue group-hover:text-brand-blue transition-colors">
-              <ArrowUpRight className="h-3.5 w-3.5" />
-            </span>
-          </div>
-        </div>
-      </div>
-    </a>
+function PostMeta({ post }: { post: BlogPost }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Avatar name={post.author} />
+      <span className="text-xs text-[oklch(0.50_0.022_258)] truncate">{post.author}</span>
+      <span className="text-[oklch(0.82_0.01_255)] shrink-0">·</span>
+      <span className="text-xs text-[oklch(0.60_0.018_258)] shrink-0">{fmtDate(post.date)}</span>
+    </div>
   )
 }
 
 export default function Blogs() {
+  const [cat, setCat]     = useState('All')
+  const [query, setQuery] = useState('')
+
+  const filtered   = BLOG_POSTS.filter(p =>
+    (cat === 'All' || p.category === cat) &&
+    (!query || p.title.toLowerCase().includes(query.toLowerCase()))
+  )
+  const featured   = BLOG_POSTS.filter(p => p.featured)
+  const showFilter = cat !== 'All' || !!query
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-[oklch(0.99_0.003_250)] flex flex-col">
       <Header />
       <main className="flex-1">
-        <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-12 pb-20">
 
-          {/* Page header */}
-          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-brand-blue" />
-            FROM THE BLOG
-          </span>
-          <div className="mt-3 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-            <h1 className="text-4xl sm:text-5xl font-bold text-foreground tracking-tight">
-              Walk-in drive insights<br className="hidden sm:block" /> &amp; tips.
-            </h1>
-            <p className="text-sm text-muted-foreground max-w-sm">
-              Hand-picked articles from India's top career platforms to help you crack your next walk-in.
-            </p>
+        {/* ── Header ── */}
+        <section className="bg-white border-b border-[oklch(0.905_0.01_255)]">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+            <div className="flex items-center gap-1.5 text-sm text-[oklch(0.50_0.022_258)] mb-5">
+              <Link to="/" className="hover:text-brand-blue transition-colors">Home</Link>
+              <ChevronRight className="h-3.5 w-3.5" />
+              <span className="text-[oklch(0.13_0.04_264)] font-medium">Blog</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-[oklch(0.13_0.04_264)]">Career Insights & Interview Tips</h1>
+                <p className="mt-1 text-sm text-[oklch(0.50_0.022_258)]">Expert advice to help you land your next walk-in job</p>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[oklch(0.60_0.018_258)]" />
+                <input
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Search articles…"
+                  className="w-full rounded-lg border border-[oklch(0.905_0.01_255)] bg-[oklch(0.975_0.005_250)] pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex items-center gap-2 overflow-x-auto scrollbar-none">
+              {CATEGORIES.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setCat(c)}
+                  className={[
+                    'shrink-0 flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold border transition-all',
+                    cat === c
+                      ? 'bg-brand-blue text-white border-brand-blue shadow-sm'
+                      : 'border-[oklch(0.905_0.01_255)] text-[oklch(0.42_0.022_258)] hover:border-brand-blue/30 hover:text-[oklch(0.13_0.04_264)] bg-white',
+                  ].join(' ')}
+                >
+                  {c !== 'All' && CAT_ICONS[c]}
+                  {c}
+                </button>
+              ))}
+            </div>
           </div>
-
-          {/* Grid */}
-          <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {blogPosts.map((post) => (
-              <BlogCard key={post.url} post={post} />
-            ))}
-          </div>
-
         </section>
+
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+
+          {/* Featured */}
+          {!showFilter && featured.length > 0 && (
+            <div className="mb-12">
+              <p className="text-xs font-bold tracking-widest text-brand-blue uppercase mb-5">Featured</p>
+              <div className="grid lg:grid-cols-2 gap-5">
+                {featured.map(post => (
+                  <Link key={post.id} to={`/blogs/${post.id}`} className="group block">
+                    <article className="overflow-hidden rounded-2xl border border-[oklch(0.905_0.01_255)] bg-white hover:border-brand-blue/30 hover:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] transition-all duration-200">
+                      <div className="aspect-[16/9] overflow-hidden bg-[oklch(0.965_0.007_252)]">
+                        <img src={post.image} alt={post.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      </div>
+                      <div className="p-6">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-[11px] font-bold text-brand-blue bg-brand-blue/8 px-2 py-0.5 rounded-md">{post.category}</span>
+                          <span className="text-[11px] text-[oklch(0.60_0.018_258)] flex items-center gap-1.5"><Clock className="h-3 w-3" />{post.readTime} min read</span>
+                        </div>
+                        <h2 className="text-[18px] font-bold text-[oklch(0.13_0.04_264)] group-hover:text-brand-blue transition-colors line-clamp-2 leading-snug">{post.title}</h2>
+                        <p className="mt-2 text-sm text-[oklch(0.50_0.022_258)] line-clamp-2 leading-relaxed">{post.excerpt}</p>
+                        <div className="mt-4 flex items-center justify-between">
+                          <PostMeta post={post} />
+                          <span className="text-xs font-semibold text-brand-blue flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            Read <ArrowRight className="h-3 w-3" />
+                          </span>
+                        </div>
+                      </div>
+                    </article>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Article grid */}
+          {!showFilter && <p className="text-xs font-bold tracking-widest text-[oklch(0.50_0.022_258)] uppercase mb-5">All Articles</p>}
+
+          {filtered.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-[oklch(0.905_0.01_255)] py-16 text-center">
+              <p className="text-sm text-[oklch(0.50_0.022_258)]">No articles found.</p>
+              <button onClick={() => { setQuery(''); setCat('All') }} className="mt-2 text-sm text-brand-blue font-semibold hover:underline">Clear filters</button>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {(showFilter ? filtered : filtered.filter(p => !p.featured)).map(post => (
+                <Link key={post.id} to={`/blogs/${post.id}`} className="group block">
+                  <article className="bg-white rounded-xl border border-[oklch(0.905_0.01_255)] overflow-hidden hover:border-brand-blue/30 hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.08)] transition-all duration-200 h-full flex flex-col">
+                    <div className="aspect-[16/9] overflow-hidden bg-[oklch(0.965_0.007_252)]">
+                      <img src={post.image} alt={post.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    </div>
+                    <div className="p-5 flex flex-col flex-1">
+                      <div className="flex items-center gap-2 mb-2.5">
+                        <span className="text-[10px] font-bold text-brand-blue bg-brand-blue/8 px-2 py-0.5 rounded-md">{post.category}</span>
+                        <span className="text-[10px] text-[oklch(0.60_0.018_258)] flex items-center gap-1.5"><Clock className="h-3 w-3" />{post.readTime} min</span>
+                      </div>
+                      <h2 className="text-[15px] font-bold text-[oklch(0.13_0.04_264)] group-hover:text-brand-blue transition-colors line-clamp-2 leading-snug flex-1">{post.title}</h2>
+                      <p className="mt-2 text-sm text-[oklch(0.50_0.022_258)] line-clamp-2 leading-relaxed">{post.excerpt}</p>
+                      <div className="mt-4 pt-3.5 border-t border-[oklch(0.965_0.007_252)]">
+                        <PostMeta post={post} />
+                      </div>
+                    </div>
+                  </article>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
       <Footer />
     </div>

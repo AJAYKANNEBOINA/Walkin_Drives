@@ -57,4 +57,7 @@ export interface FilterState {
   experience: string;
   mode: string;
   salary: string;
+  category: string;
+  sort: string;
+  dateRange: string;
 }

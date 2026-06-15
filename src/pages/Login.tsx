@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 import { Input } from '@/components/ui/Input'
+
+const googleProvider = new GoogleAuthProvider()
 
 export default function Login() {
   const navigate = useNavigate()
@@ -10,23 +13,41 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading]       = useState(false)
+  const [resetSent, setResetSent]   = useState(false)
+
+  const handleForgotPassword = async () => {
+    if (!email) { setError('Enter your email address first.'); return }
+    try {
+      await sendPasswordResetEmail(auth, email)
+      setResetSent(true)
+      setError('')
+    } catch {
+      setError('Could not send reset email. Check the address and try again.')
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    setLoading(false)
-    if (error) return setError(error.message)
-    navigate('/dashboard')
+    try {
+      await signInWithEmailAndPassword(auth, email, password)
+      navigate('/dashboard')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Sign in failed.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` },
-    })
+    try {
+      await signInWithPopup(auth, googleProvider)
+      navigate('/dashboard')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Google sign in failed.')
+    }
   }
 
   return (
@@ -37,8 +58,8 @@ export default function Login() {
         <div className="mx-auto w-full max-w-md">
 
           <Link to="/" className="flex items-center gap-2 mb-10">
-            <img src="/logos/logo.jpg" alt="WalkinDrives" className="h-8 w-8 rounded-lg object-contain" />
-            <span className="text-[17px] font-bold text-foreground tracking-tight">WalkinDrives<span className="text-brand-blue">.in</span></span>
+            <img src="/logos/logo.jpg" alt="Walkins" className="h-8 w-8 rounded-lg object-contain" />
+            <span className="text-[22px] font-black tracking-[-0.04em] text-[oklch(0.13_0.04_264)]">Walkins</span>
           </Link>
 
           <h1 className="text-3xl font-bold text-foreground">Welcome back</h1>
@@ -76,13 +97,20 @@ export default function Login() {
             {error && (
               <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>
             )}
+            {resetSent && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                ✅ Password reset email sent to <strong>{email}</strong>. Check your inbox.
+              </div>
+            )}
 
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
                 <input type="checkbox" className="h-4 w-4 rounded accent-[oklch(0.62_0.22_260)]" />
                 Remember me
               </label>
-              <a href="#" className="text-sm font-medium text-brand-blue hover:underline">Forgot password?</a>
+              <button type="button" onClick={handleForgotPassword} className="text-sm font-medium text-brand-blue hover:underline">
+                Forgot password?
+              </button>
             </div>
 
             <button

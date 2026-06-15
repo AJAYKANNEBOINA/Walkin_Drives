@@ -1,8 +1,10 @@
-import { supabase } from '@/lib/supabase'
+import {
+  collection, doc, getDoc, getDocs, addDoc, query, where,
+} from 'firebase/firestore'
+import { db, isConfigured } from '@/lib/firebase'
+import { auth } from '@/lib/firebase'
 import { mockDrives } from '@/lib/mockData'
-import { isConfigured } from '@/lib/supabase'
-import type { Drive } from '@/types'
-import type { DriveWithCompany } from '@/lib/database.types'
+import type { Drive, WorkMode } from '@/types'
 
 const COMPANY_LOGO_MAP: Record<string, string> = {
   'Genpact': '/logos/genpact.svg', 'Capgemini': '/logos/capgemini.svg',
@@ -13,7 +15,35 @@ const COMPANY_LOGO_MAP: Record<string, string> = {
   'ICICI Bank': '/logos/icici.svg', 'Sopra Steria': '/logos/sopra.svg',
 }
 
-function mapDrive(row: DriveWithCompany): Drive {
+// Firestore drive documents embed company data directly
+interface FirestoreDrive {
+  id: string
+  role: string
+  location: string
+  city: string
+  mode: string
+  experience: string
+  eligibility: string | null
+  salary: string | null
+  skills: string[] | null
+  openings: number | null
+  drive_date: string
+  drive_time: string
+  description: string | null
+  status: string
+  is_active: boolean
+  is_priority: boolean
+  contact_email: string | null
+  posted_by: string | null
+  created_at: string
+  company_id: string
+  company_name: string
+  company_industry: string | null
+  company_verified: boolean
+  company_logo_url: string | null
+}
+
+function mapDrive(row: FirestoreDrive): Drive {
   const daysDiff = Math.floor(
     (Date.now() - new Date(row.created_at).getTime()) / 86_400_000
   )
@@ -22,7 +52,7 @@ function mapDrive(row: DriveWithCompany): Drive {
     role:            row.role,
     location:        row.location,
     city:            row.city,
-    mode:            row.mode,
+    mode:            row.mode as WorkMode,
     experience:      row.experience,
     eligibility:     row.eligibility ?? '',
     salary:          row.salary ?? undefined,
@@ -36,11 +66,11 @@ function mapDrive(row: DriveWithCompany): Drive {
     posted_days_ago: daysDiff,
     created_at:      row.created_at,
     company: {
-      id:       row.company.id,
-      name:     row.company.name,
-      industry: row.company.industry ?? undefined,
-      verified: row.company.verified,
-      logo_url: COMPANY_LOGO_MAP[row.company.name] ?? row.company.logo_url ?? '',
+      id:       row.company_id,
+      name:     row.company_name,
+      industry: row.company_industry ?? undefined,
+      verified: row.company_verified,
+      logo_url: COMPANY_LOGO_MAP[row.company_name] ?? row.company_logo_url ?? '',
     },
   }
 }
@@ -57,38 +87,39 @@ export async function fetchDrives(filter: DrivesFilter = {}): Promise<Drive[]> {
 
   const today = new Date().toISOString().split('T')[0]
 
-  let q = supabase
-    .from('drives')
-    .select('*, company:companies(*)')
-    .eq('status', 'approved')
-    .eq('is_active', true)
-    .gte('drive_date', today)
-    .order('is_priority', { ascending: false })
-    .order('drive_date', { ascending: true })
+  // Fetch only approved drives — all other filtering is client-side to avoid composite index requirements
+  const q = query(collection(db, 'drives'), where('status', '==', 'approved'))
+  const snap = await getDocs(q)
 
-  if (filter.cities?.length)     q = q.in('city', filter.cities)
-  if (filter.experience)         q = q.eq('experience', filter.experience)
-  if (filter.mode)               q = q.eq('mode', filter.mode)
+  let drives = snap.docs
+    .map(d => mapDrive({ id: d.id, ...d.data() } as FirestoreDrive))
+    .filter(d => d.is_active && d.drive_date >= today)
+
+  if (filter.cities?.length)  drives = drives.filter(d => filter.cities!.includes(d.city))
+  if (filter.experience)      drives = drives.filter(d => d.experience === filter.experience)
+  if (filter.mode)            drives = drives.filter(d => d.mode === filter.mode)
   if (filter.query) {
-    q = q.or(`role.ilike.%${filter.query}%,city.ilike.%${filter.query}%`)
+    const q = filter.query.toLowerCase()
+    drives = drives.filter(d =>
+      d.role.toLowerCase().includes(q) || d.city.toLowerCase().includes(q)
+    )
   }
 
-  const { data, error } = await q
-  if (error) throw error
-  return (data as DriveWithCompany[]).map(mapDrive)
+  // Priority first, then by date
+  drives.sort((a, b) => {
+    if (b.is_priority !== a.is_priority) return (b.is_priority ? 1 : 0) - (a.is_priority ? 1 : 0)
+    return a.drive_date.localeCompare(b.drive_date)
+  })
+
+  return drives
 }
 
 export async function fetchDriveById(id: string): Promise<Drive | null> {
   if (!isConfigured) return mockDrives.find(d => d.id === id) ?? null
 
-  const { data, error } = await supabase
-    .from('drives')
-    .select('*, company:companies(*)')
-    .eq('id', id)
-    .single()
-
-  if (error) return null
-  return mapDrive(data as DriveWithCompany)
+  const snap = await getDoc(doc(db, 'drives', id))
+  if (!snap.exists()) return null
+  return mapDrive({ id: snap.id, ...snap.data() } as FirestoreDrive)
 }
 
 export interface PostDrivePayload {
@@ -108,62 +139,65 @@ export interface PostDrivePayload {
   skills:       string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as any
-
 export async function postDrive(payload: PostDrivePayload, userId: string): Promise<void> {
-  if (!isConfigured) throw new Error('Supabase is not configured. Check your .env file.')
+  if (!isConfigured) throw new Error('Firebase is not configured. Check your .env file.')
   if (!userId) throw new Error('You must be logged in to post a drive.')
 
-  // Ensure profile exists for this user (in case trigger didn't fire)
-  const { data: { user } } = await supabase.auth.getUser()
-  await db.from('profiles').upsert({
-    id:        userId,
-    email:     user?.email ?? null,
-    full_name: user?.user_metadata?.full_name ?? null,
-  }, { onConflict: 'id' })
+  const user = auth.currentUser
 
-  // Try to find existing company first, then insert if not found
+  // Ensure user profile doc exists
+  const { setDoc, doc: firestoreDoc } = await import('firebase/firestore')
+  await setDoc(firestoreDoc(db, 'users', userId), {
+    email:      user?.email ?? null,
+    full_name:  user?.displayName ?? null,
+    updated_at: new Date().toISOString(),
+  }, { merge: true })
+
+  // Find or create company
+  const companiesSnap = await getDocs(
+    query(collection(db, 'companies'), where('name_lower', '==', payload.company.toLowerCase()))
+  )
+
   let companyId: string
+  let companyVerified = false
 
-  const { data: existing } = await db
-    .from('companies')
-    .select('id')
-    .ilike('name', payload.company)
-    .maybeSingle()
-
-  if (existing) {
+  if (!companiesSnap.empty) {
+    const existing = companiesSnap.docs[0]
     companyId = existing.id
+    companyVerified = existing.data().verified ?? false
   } else {
-    const { data: newCompany, error: cErr } = await db
-      .from('companies')
-      .insert({ name: payload.company, verified: false })
-      .select('id')
-      .single()
-    if (cErr) throw new Error(`Company error: ${cErr.message}`)
-    companyId = newCompany.id
+    const ref = await addDoc(collection(db, 'companies'), {
+      name:       payload.company,
+      name_lower: payload.company.toLowerCase(),
+      verified:   false,
+      created_at: new Date().toISOString(),
+    })
+    companyId = ref.id
   }
 
-  const { error } = await db.from('drives').insert({
-    company_id:    companyId,
-    role:          payload.role,
-    location:      payload.location,
-    city:          payload.city,
-    mode:          payload.mode,
-    experience:    payload.experience,
-    eligibility:   payload.eligibility || null,
-    salary:        payload.salary || null,
-    skills:        payload.skills ? payload.skills.split(',').map(s => s.trim()) : null,
-    openings:      payload.openings ? parseInt(payload.openings) : null,
-    drive_date:    payload.driveDate,
-    drive_time:    payload.driveTime,
-    description:   payload.description || null,
-    contact_email: payload.contactEmail,
-    posted_by:     userId,
-    status:        'pending',
-    is_active:     false,
-    is_priority:   false,
+  await addDoc(collection(db, 'drives'), {
+    company_id:       companyId,
+    company_name:     payload.company,
+    company_industry: null,
+    company_verified: companyVerified,
+    company_logo_url: null,
+    role:             payload.role,
+    location:         payload.location,
+    city:             payload.city,
+    mode:             payload.mode,
+    experience:       payload.experience,
+    eligibility:      payload.eligibility || null,
+    salary:           payload.salary || null,
+    skills:           payload.skills ? payload.skills.split(',').map(s => s.trim()) : null,
+    openings:         payload.openings ? parseInt(payload.openings) : null,
+    drive_date:       payload.driveDate,
+    drive_time:       payload.driveTime,
+    description:      payload.description || null,
+    contact_email:    payload.contactEmail,
+    posted_by:        userId,
+    status:           'pending',
+    is_active:        false,
+    is_priority:      false,
+    created_at:       new Date().toISOString(),
   })
-
-  if (error) throw new Error(`Drive error: ${error.message}`)
 }

@@ -76,7 +76,7 @@ export default function AdminDashboard() {
             </span>
             <div>
               <p className="text-sm font-bold text-foreground">Admin Panel</p>
-              <p className="text-[11px] text-muted-foreground">WalkinDrives.in</p>
+              <p className="text-[11px] text-muted-foreground">Walkins</p>
             </div>
           </div>
           <div className="flex items-center gap-3">

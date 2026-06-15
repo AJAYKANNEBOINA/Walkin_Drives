@@ -1,20 +1,14 @@
-import { supabase, isConfigured } from '@/lib/supabase'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { db, isConfigured } from '@/lib/firebase'
 import type { DbProfile } from '@/lib/database.types'
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as any
 
 export async function fetchProfile(userId: string): Promise<DbProfile | null> {
   if (!isConfigured) return null
 
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single()
+  const snap = await getDoc(doc(db, 'users', userId))
+  if (!snap.exists()) return null
 
-  if (error) return null
-  return data as DbProfile
+  return { id: userId, ...snap.data() } as DbProfile
 }
 
 export async function updateProfile(
@@ -23,12 +17,10 @@ export async function updateProfile(
 ): Promise<void> {
   if (!isConfigured) return
 
-  const { error } = await db
-    .from('profiles')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', userId)
-
-  if (error) throw error
+  await setDoc(doc(db, 'users', userId), {
+    ...updates,
+    updated_at: new Date().toISOString(),
+  }, { merge: true })
 }
 
 export async function saveJobAlert(
@@ -37,9 +29,9 @@ export async function saveJobAlert(
 ): Promise<void> {
   if (!isConfigured) return
 
-  const { error } = await db
-    .from('job_alerts')
-    .upsert({ user_id: userId, ...prefs }, { onConflict: 'user_id' })
-
-  if (error) throw error
+  await setDoc(doc(db, 'job_alerts', userId), {
+    user_id: userId,
+    ...prefs,
+    updated_at: new Date().toISOString(),
+  }, { merge: true })
 }

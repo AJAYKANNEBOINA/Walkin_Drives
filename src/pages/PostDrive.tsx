@@ -26,7 +26,7 @@ export default function PostDrive() {
     try {
       await postDriveMutation.mutateAsync({
         payload: form,
-        userId: user?.id ?? '',
+        userId: user?.uid ?? '',
       })
       setSubmitted(true)
     } catch (err) {

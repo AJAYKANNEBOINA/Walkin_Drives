@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { User } from '@supabase/supabase-js'
-import { supabase, isConfigured } from '@/lib/supabase'
+import type { User } from 'firebase/auth'
+import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
+import { auth, db, isConfigured } from '@/lib/firebase'
 
 interface AuthContextType {
   user: User | null
@@ -16,49 +18,38 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 })
 
+async function fetchIsAdmin(userId: string): Promise<boolean> {
+  if (!isConfigured) return false
+  try {
+    const snap = await getDoc(doc(db, 'users', userId))
+    return snap.exists() && snap.data()?.is_admin === true
+  } catch (err) {
+    console.error('[fetchIsAdmin] error:', err)
+    return false
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser]       = useState<User | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  async function fetchIsAdmin(userId: string) {
-    if (!isConfigured) return false
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', userId)
-      .single()
-    if (error) console.error('[fetchIsAdmin] error:', error.message)
-    console.log('[fetchIsAdmin] userId:', userId, '→ is_admin:', data?.is_admin)
-    return data?.is_admin === true
-  }
-
-  async function handleUser(u: User | null) {
-    setUser(u)
-    if (u) {
-      const admin = await fetchIsAdmin(u.id)
-      setIsAdmin(admin)
-    } else {
-      setIsAdmin(false)
-    }
-    setLoading(false)
-  }
-
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      handleUser(data.session?.user ?? null)
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      setUser(u)
+      if (u) {
+        const admin = await fetchIsAdmin(u.uid)
+        setIsAdmin(admin)
+      } else {
+        setIsAdmin(false)
+      }
+      setLoading(false)
     })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      handleUser(session?.user ?? null)
-    })
-
-    return () => subscription.unsubscribe()
+    return unsubscribe
   }, [])
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    await firebaseSignOut(auth)
     setUser(null)
     setIsAdmin(false)
   }

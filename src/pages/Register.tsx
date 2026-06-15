@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, User, Phone, MapPin, Eye, EyeOff, ArrowRight, CheckCircle2 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile } from 'firebase/auth'
+import { doc, setDoc } from 'firebase/firestore'
+import { auth, db } from '@/lib/firebase'
 import { Input } from '@/components/ui/Input'
 import { CITIES } from '@/lib/mockData'
+
+const googleProvider = new GoogleAuthProvider()
 
 export default function Register() {
   const navigate = useNavigate()
@@ -21,24 +25,43 @@ export default function Register() {
     if (form.password !== form.confirmPassword) return setError('Passwords do not match.')
     if (form.password.length < 6) return setError('Password must be at least 6 characters.')
     setLoading(true)
-    const { data, error } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-      options: { data: { full_name: form.name, phone: form.phone, city: form.city, experience: form.experience } },
-    })
-    setLoading(false)
-    if (error) return setError(error.message)
-    // If email confirmation is enabled, session will be null until verified
-    if (data.session) {
+    try {
+      const { user } = await createUserWithEmailAndPassword(auth, form.email, form.password)
+      await updateProfile(user, { displayName: form.name })
+      await setDoc(doc(db, 'users', user.uid), {
+        email:      form.email,
+        full_name:  form.name,
+        phone:      form.phone,
+        city:       form.city,
+        experience: form.experience,
+        is_admin:   false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       navigate('/dashboard')
-    } else {
-      setError('')
-      navigate('/verify-email')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Registration failed.')
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleGoogle = async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/dashboard` } })
+    try {
+      const { user } = await signInWithPopup(auth, googleProvider)
+      // Create profile doc if first time
+      const profileRef = doc(db, 'users', user.uid)
+      await setDoc(profileRef, {
+        email:      user.email ?? '',
+        full_name:  user.displayName ?? '',
+        is_admin:   false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { merge: true })
+      navigate('/dashboard')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Google sign up failed.')
+    }
   }
 
   return (
@@ -67,8 +90,8 @@ export default function Register() {
       <div className="flex flex-1 flex-col justify-center px-6 py-12 lg:px-16 xl:px-24 overflow-y-auto">
         <div className="mx-auto w-full max-w-md">
           <Link to="/" className="flex items-center gap-2 mb-8">
-            <img src="/logos/logo.jpg" alt="WalkinDrives" className="h-8 w-8 rounded-lg object-contain" />
-            <span className="text-[17px] font-bold text-foreground tracking-tight">WalkinDrives<span className="text-brand-blue">.in</span></span>
+            <img src="/logos/logo.jpg" alt="Walkins" className="h-8 w-8 rounded-lg object-contain" />
+            <span className="text-[22px] font-black tracking-[-0.04em] text-[oklch(0.13_0.04_264)]">Walkins</span>
           </Link>
 
           <h1 className="text-3xl font-bold text-foreground">Create your account</h1>
@@ -130,7 +153,7 @@ export default function Register() {
 
             <label className="flex items-start gap-2.5 text-sm text-muted-foreground cursor-pointer">
               <input type="checkbox" required className="mt-0.5 h-4 w-4 accent-[oklch(0.62_0.22_260)]" />
-              I agree to the <a href="#" className="text-brand-blue hover:underline">Terms of Use</a> and <a href="#" className="text-brand-blue hover:underline">Privacy Policy</a>
+              I agree to the <Link to="/terms" className="text-brand-blue hover:underline">Terms of Use</Link> and <Link to="/privacy" className="text-brand-blue hover:underline">Privacy Policy</Link>
             </label>
 
             <button

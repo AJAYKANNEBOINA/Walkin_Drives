@@ -1,9 +1,10 @@
-import { supabase, isConfigured } from '@/lib/supabase'
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as any
+import {
+  collection, doc, getDoc, getDocs, addDoc, deleteDoc, query,
+  where, orderBy,
+} from 'firebase/firestore'
+import { db, isConfigured } from '@/lib/firebase'
 import { mockApplications } from '@/lib/mockData'
-import type { Application } from '@/types'
-import type { ApplicationWithDrive } from '@/lib/database.types'
+import type { Application, WorkMode } from '@/types'
 
 const COMPANY_LOGO_MAP: Record<string, string> = {
   'Genpact': '/logos/genpact.svg', 'Capgemini': '/logos/capgemini.svg',
@@ -14,83 +15,82 @@ const COMPANY_LOGO_MAP: Record<string, string> = {
   'ICICI Bank': '/logos/icici.svg', 'Sopra Steria': '/logos/sopra.svg',
 }
 
-function mapApplication(row: ApplicationWithDrive): Application {
-  return {
-    id:         row.id,
-    user_id:    row.user_id,
-    status:     row.status,
-    applied_at: row.applied_at,
-    drive: {
-      id:              row.drive.id,
-      role:            row.drive.role,
-      location:        row.drive.location,
-      city:            row.drive.city,
-      mode:            row.drive.mode,
-      experience:      row.drive.experience,
-      eligibility:     row.drive.eligibility ?? '',
-      salary:          row.drive.salary ?? undefined,
-      skills:          row.drive.skills ?? [],
-      openings:        row.drive.openings ?? undefined,
-      drive_date:      row.drive.drive_date,
-      drive_time:      row.drive.drive_time,
-      is_priority:     row.drive.is_priority,
-      is_active:       row.drive.is_active,
-      posted_days_ago: 0,
-      created_at:      row.drive.created_at,
-      company: {
-        id:       row.drive.company.id,
-        name:     row.drive.company.name,
-        industry: row.drive.company.industry ?? undefined,
-        verified: row.drive.company.verified,
-        logo_url: COMPANY_LOGO_MAP[row.drive.company.name] ?? '',
-      },
-    },
-  }
-}
-
 export async function fetchUserApplications(userId: string): Promise<Application[]> {
   if (!isConfigured) return mockApplications
 
-  const { data, error } = await supabase
-    .from('applications')
-    .select('*, drive:drives(*, company:companies(*))')
-    .eq('user_id', userId)
-    .order('applied_at', { ascending: false })
+  const q = query(
+    collection(db, 'applications'),
+    where('user_id', '==', userId),
+    orderBy('applied_at', 'desc')
+  )
+  const snap = await getDocs(q)
 
-  if (error) throw error
-  return (data as ApplicationWithDrive[]).map(mapApplication)
+  const applications: Application[] = []
+
+  for (const appDoc of snap.docs) {
+    const appData = appDoc.data()
+    const driveSnap = await getDoc(doc(db, 'drives', appData.drive_id))
+    if (!driveSnap.exists()) continue
+
+    const drive = driveSnap.data()
+    applications.push({
+      id:         appDoc.id,
+      user_id:    appData.user_id,
+      status:     appData.status ?? 'applied',
+      applied_at: appData.applied_at,
+      drive: {
+        id:              driveSnap.id,
+        role:            drive.role,
+        location:        drive.location,
+        city:            drive.city,
+        mode:            drive.mode as WorkMode,
+        experience:      drive.experience,
+        eligibility:     drive.eligibility ?? '',
+        salary:          drive.salary ?? undefined,
+        skills:          drive.skills ?? [],
+        openings:        drive.openings ?? undefined,
+        drive_date:      drive.drive_date,
+        drive_time:      drive.drive_time,
+        is_priority:     drive.is_priority,
+        is_active:       drive.is_active,
+        posted_days_ago: 0,
+        created_at:      drive.created_at,
+        company: {
+          id:       drive.company_id,
+          name:     drive.company_name,
+          industry: drive.company_industry ?? undefined,
+          verified: drive.company_verified,
+          logo_url: COMPANY_LOGO_MAP[drive.company_name] ?? '',
+        },
+      },
+    })
+  }
+
+  return applications
 }
 
 export async function applyToDrive(driveId: string, userId: string): Promise<void> {
   if (!isConfigured) return
-
-  const { error } = await db
-    .from('applications')
-    .insert({ drive_id: driveId, user_id: userId })
-
-  if (error) throw error
+  await addDoc(collection(db, 'applications'), {
+    drive_id:   driveId,
+    user_id:    userId,
+    status:     'applied',
+    applied_at: new Date().toISOString(),
+  })
 }
 
 export async function withdrawApplication(applicationId: string): Promise<void> {
   if (!isConfigured) return
-
-  const { error } = await supabase
-    .from('applications')
-    .delete()
-    .eq('id', applicationId)
-
-  if (error) throw error
+  await deleteDoc(doc(db, 'applications', applicationId))
 }
 
 export async function hasApplied(driveId: string, userId: string): Promise<boolean> {
   if (!isConfigured) return false
-
-  const { data } = await supabase
-    .from('applications')
-    .select('id')
-    .eq('drive_id', driveId)
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  return !!data
+  const q = query(
+    collection(db, 'applications'),
+    where('drive_id', '==', driveId),
+    where('user_id', '==', userId)
+  )
+  const snap = await getDocs(q)
+  return !snap.empty
 }
