@@ -24,6 +24,7 @@ export default function DriveDetail() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [applySuccess, setApplySuccess] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const { data: drive, isLoading } = useDrive(id)
   const { data: allDrives = [] } = useDrives()
@@ -57,7 +58,6 @@ export default function DriveDetail() {
 
   const today      = new Date().toISOString().split('T')[0]
   const isExpired  = drive.drive_date < today
-  const [copied, setCopied] = useState(false)
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl)
