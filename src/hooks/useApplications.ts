@@ -4,6 +4,7 @@ import {
   applyToDrive,
   withdrawApplication,
   hasApplied,
+  type ApplyDetails,
 } from '@/lib/api/applications'
 
 export function useApplications(userId: string | undefined) {
@@ -27,8 +28,8 @@ export function useHasApplied(driveId: string, userId: string | undefined) {
 export function useApply() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ driveId, userId }: { driveId: string; userId: string }) =>
-      applyToDrive(driveId, userId),
+    mutationFn: ({ driveId, userId, details }: { driveId: string; userId: string; details?: ApplyDetails }) =>
+      applyToDrive(driveId, userId, details),
     onSuccess: (_data, { driveId, userId }) => {
       qc.invalidateQueries({ queryKey: ['applications', userId] })
       qc.invalidateQueries({ queryKey: ['hasApplied', driveId, userId] })

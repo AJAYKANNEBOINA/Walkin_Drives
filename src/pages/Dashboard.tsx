@@ -12,8 +12,12 @@ import { StatusBadge } from '@/components/ui/Badge'
 import { CompanyLogo } from '@/components/ui/CompanyLogo'
 import { useAuth } from '@/context/AuthContext'
 import { useApplications } from '@/hooks/useApplications'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchProfile } from '@/lib/api/profiles'
+import {
+  fetchRecruiterDrives, fetchDriveApplicants, updateApplicantStatus,
+  type Applicant, type RecruiterDrive,
+} from '@/lib/api/recruiter'
 import {
   useAdminDrives, useAdminStats,
   useApproveDrive, useRejectDrive, useDeleteDrive,
@@ -21,7 +25,7 @@ import {
 import type { AdminDrive } from '@/lib/api/admin'
 
 export default function Dashboard() {
-  const { user, isAdmin, signOut } = useAuth()
+  const { user, isAdmin, isRecruiter, signOut } = useAuth()
   const navigate  = useNavigate()
   const location  = useLocation()
 
@@ -56,6 +60,29 @@ export default function Dashboard() {
   const remove  = useDeleteDrive()
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [activeTab, setActiveTab]         = useState<'pending' | 'approved' | 'rejected'>('pending')
+  const [expandedDrive, setExpandedDrive] = useState<string | null>(null)
+
+  // Recruiter data
+  const qc = useQueryClient()
+  const { data: recruiterDrives = [] } = useQuery({
+    queryKey: ['recruiter-drives', user?.uid],
+    queryFn:  () => fetchRecruiterDrives(user!.uid),
+    enabled:  !!user && isRecruiter && !isAdmin,
+  })
+  const { data: driveApplicants = [] } = useQuery({
+    queryKey: ['drive-applicants', expandedDrive],
+    queryFn:  () => fetchDriveApplicants(expandedDrive!),
+    enabled:  !!expandedDrive,
+  })
+  const statusMutation = useMutation({
+    mutationFn: ({ appId, status, applicant, drive }: {
+      appId: string
+      status: 'shortlisted' | 'rejected' | 'selected'
+      applicant: Pick<Applicant, 'name' | 'email'>
+      drive: Pick<RecruiterDrive, 'role' | 'company_name' | 'drive_date' | 'drive_time' | 'city'>
+    }) => updateApplicantStatus(appId, status, applicant, drive),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['drive-applicants', expandedDrive] }),
+  })
 
   if (!user) {
     return (
@@ -151,10 +178,11 @@ export default function Dashboard() {
                   /* User nav */
                   <>
                     {[
-                      { icon: LayoutDashboard, label: 'Dashboard',   to: '/dashboard'  },
-                      { icon: Bell,            label: 'Job Alerts',  to: '/job-alerts' },
-                      { icon: User,            label: 'My Profile',  to: '/profile'    },
-                      { icon: FileText,        label: 'Blog',        to: '/blogs'      },
+                      { icon: LayoutDashboard, label: 'Dashboard',      to: '/dashboard'  },
+                      ...(isRecruiter ? [{ icon: Briefcase, label: 'My Drives', to: '/dashboard' }] : []),
+                      { icon: Bell,            label: 'Job Alerts',     to: '/job-alerts' },
+                      { icon: User,            label: 'My Profile',     to: '/profile'    },
+                      { icon: FileText,        label: 'Blog',           to: '/blogs'      },
                     ].map(({ icon: Icon, label, to }) => (
                       <Link
                         key={label}
@@ -301,6 +329,123 @@ export default function Dashboard() {
                     )}
                   </div>
                 </>
+              )}
+
+              {/* ════════════ RECRUITER VIEW ════════════ */}
+              {isRecruiter && !isAdmin && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-semibold text-foreground">My Posted Drives</h2>
+                    <Link to="/post-drive" className="inline-flex items-center gap-1.5 rounded-full bg-brand-blue px-4 py-2 text-xs font-semibold text-white hover:brightness-110 transition">
+                      <Calendar className="h-3.5 w-3.5" /> Post Drive
+                    </Link>
+                  </div>
+
+                  {recruiterDrives.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+                      <Briefcase className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-sm font-semibold text-foreground">No drives posted yet</p>
+                      <p className="text-xs text-muted-foreground mt-1 mb-4">Post your first walk-in drive to start receiving applications.</p>
+                      <Link to="/post-drive" className="inline-flex items-center gap-1.5 rounded-full bg-brand-blue px-5 py-2 text-xs font-semibold text-white hover:brightness-110 transition">
+                        Post a Drive <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {recruiterDrives.map(drive => (
+                        <div key={drive.id} className="rounded-2xl border border-border bg-card overflow-hidden">
+                          {/* Drive header */}
+                          <button
+                            onClick={() => setExpandedDrive(expandedDrive === drive.id ? null : drive.id)}
+                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-secondary/50 transition-colors text-left"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                  drive.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                                  drive.status === 'pending'  ? 'bg-amber-100 text-amber-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>{drive.status}</span>
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3" />{drive.drive_date}</span>
+                              </div>
+                              <p className="font-semibold text-foreground text-sm truncate">{drive.role}</p>
+                              <p className="text-xs text-muted-foreground">{drive.company_name} · {drive.city}</p>
+                            </div>
+                            <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 ml-4 transition-transform ${expandedDrive === drive.id ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {/* Applicants table */}
+                          {expandedDrive === drive.id && (
+                            <div className="border-t border-border">
+                              {driveApplicants.length === 0 ? (
+                                <div className="py-8 text-center text-xs text-muted-foreground">No applications yet for this drive.</div>
+                              ) : (
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b border-border bg-secondary/50">
+                                        <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
+                                        <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Phone</th>
+                                        <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Experience</th>
+                                        <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
+                                        <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                      {driveApplicants.map(app => (
+                                        <tr key={app.id} className="hover:bg-secondary/30 transition-colors">
+                                          <td className="px-4 py-3">
+                                            <p className="font-medium text-foreground text-sm">{app.name}</p>
+                                            <p className="text-xs text-muted-foreground">{app.email}</p>
+                                          </td>
+                                          <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">{app.phone}</td>
+                                          <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">{app.experience}</td>
+                                          <td className="px-4 py-3">
+                                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                              app.status === 'shortlisted' ? 'bg-brand-blue/10 text-brand-blue' :
+                                              app.status === 'selected'   ? 'bg-emerald-100 text-emerald-700' :
+                                              app.status === 'rejected'   ? 'bg-red-100 text-red-600' :
+                                              'bg-secondary text-muted-foreground'
+                                            }`}>{app.status}</span>
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <div className="flex items-center gap-1.5">
+                                              {app.status !== 'shortlisted' && app.status !== 'selected' && (
+                                                <button
+                                                  onClick={() => statusMutation.mutate({ appId: app.id, status: 'shortlisted', applicant: { name: app.name, email: app.email }, drive })}
+                                                  disabled={statusMutation.isPending}
+                                                  className="rounded-full bg-brand-blue/10 px-2.5 py-1 text-[10px] font-semibold text-brand-blue hover:bg-brand-blue/20 transition disabled:opacity-50"
+                                                >Shortlist</button>
+                                              )}
+                                              {app.status === 'shortlisted' && (
+                                                <button
+                                                  onClick={() => statusMutation.mutate({ appId: app.id, status: 'selected', applicant: { name: app.name, email: app.email }, drive })}
+                                                  disabled={statusMutation.isPending}
+                                                  className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-200 transition disabled:opacity-50"
+                                                >Select</button>
+                                              )}
+                                              {app.status !== 'rejected' && (
+                                                <button
+                                                  onClick={() => statusMutation.mutate({ appId: app.id, status: 'rejected', applicant: { name: app.name, email: app.email }, drive })}
+                                                  disabled={statusMutation.isPending}
+                                                  className="rounded-full border border-border px-2.5 py-1 text-[10px] font-medium text-muted-foreground hover:border-red-300 hover:text-red-600 transition disabled:opacity-50"
+                                                >Reject</button>
+                                              )}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* ════════════ USER VIEW ════════════ */}

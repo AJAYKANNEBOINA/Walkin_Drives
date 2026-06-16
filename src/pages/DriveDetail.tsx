@@ -25,6 +25,8 @@ export default function DriveDetail() {
   const navigate = useNavigate()
   const [applySuccess, setApplySuccess] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showApplyModal, setShowApplyModal] = useState(false)
+  const [applyForm, setApplyForm] = useState({ name: '', email: '', phone: '', experience: '' })
 
   const { data: drive, isLoading } = useDrive(id)
   const { data: allDrives = [] } = useDrives()
@@ -65,10 +67,26 @@ export default function DriveDetail() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleApply = () => {
+  const handleApplyClick = () => {
     if (!user) return navigate('/login')
-    if (applied || applyMutation.isPending) return
-    applyMutation.mutate({ driveId: drive.id, userId: user.uid })
+    if (applied) return
+    // Pre-fill from user profile if available
+    setApplyForm(f => ({
+      ...f,
+      name:  user.displayName ?? '',
+      email: user.email ?? '',
+    }))
+    setShowApplyModal(true)
+  }
+
+  const handleApplySubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    applyMutation.mutate({
+      driveId: drive.id,
+      userId: user!.uid,
+      details: applyForm,
+    })
+    setShowApplyModal(false)
     setApplySuccess(true)
     setTimeout(() => setApplySuccess(false), 5000)
   }
@@ -317,7 +335,7 @@ export default function DriveDetail() {
                   </div>
                 ) : (
                 <button
-                  onClick={handleApply}
+                  onClick={handleApplyClick}
                   disabled={applied || applyMutation.isPending}
                   className="group relative w-full inline-flex items-center justify-center gap-2 rounded-full px-8 py-3.5 text-sm font-semibold text-primary-foreground bg-gradient-to-b from-[oklch(0.68_0.2_258)] to-[oklch(0.62_0.22_260)] shadow-[0_10px_30px_-10px_oklch(0.62_0.22_260/0.6),inset_0_1px_0_oklch(1_0_0/0.35)] ring-1 ring-[oklch(0.62_0.22_260/0.4)] hover:shadow-[0_18px_40px_-12px_oklch(0.62_0.22_260/0.7)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:translate-y-0"
                 >
@@ -398,6 +416,54 @@ export default function DriveDetail() {
         </div>
       </main>
       <Footer />
+
+      {/* ── Apply Modal ── */}
+      {showApplyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-foreground mb-1">Apply for {drive.role}</h2>
+            <p className="text-xs text-muted-foreground mb-5">{drive.company.name} · {drive.city}</p>
+            <form onSubmit={handleApplySubmit} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Full Name *</label>
+                <input required value={applyForm.name} onChange={e => setApplyForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Rahul Sharma"
+                  className="w-full rounded-full border border-border bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Email *</label>
+                <input required type="email" value={applyForm.email} onChange={e => setApplyForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="you@example.com"
+                  className="w-full rounded-full border border-border bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Phone *</label>
+                <input required value={applyForm.phone} onChange={e => setApplyForm(f => ({ ...f, phone: e.target.value }))}
+                  placeholder="9876543210"
+                  className="w-full rounded-full border border-border bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Experience *</label>
+                <select required value={applyForm.experience} onChange={e => setApplyForm(f => ({ ...f, experience: e.target.value }))}
+                  className="w-full rounded-full border border-border bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40">
+                  <option value="">Select experience</option>
+                  {['Freshers', '0-1 years', '1-3 years', '3-5 years', '5+ years'].map(e => <option key={e}>{e}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setShowApplyModal(false)}
+                  className="flex-1 rounded-full border border-border py-2.5 text-sm font-semibold text-foreground hover:bg-secondary transition-colors">
+                  Cancel
+                </button>
+                <button type="submit"
+                  className="flex-1 rounded-full bg-brand-blue py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all">
+                  Submit Application
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

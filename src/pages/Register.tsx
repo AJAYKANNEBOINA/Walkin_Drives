@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock, User, Phone, MapPin, Eye, EyeOff, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { Mail, Lock, User, Phone, MapPin, Eye, EyeOff, ArrowRight, CheckCircle2, Briefcase, Search } from 'lucide-react'
 import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
@@ -11,6 +11,7 @@ const googleProvider = new GoogleAuthProvider()
 
 export default function Register() {
   const navigate = useNavigate()
+  const [role, setRole] = useState<'candidate' | 'recruiter'>('candidate')
   const [form, setForm] = useState({ name: '', email: '', phone: '', city: '', experience: '', password: '', confirmPassword: '' })
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
@@ -35,6 +36,7 @@ export default function Register() {
         city:       form.city,
         experience: form.experience,
         is_admin:   false,
+        role,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -95,7 +97,30 @@ export default function Register() {
           </Link>
 
           <h1 className="text-3xl font-bold text-foreground">Create your account</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Free forever. Get instant job alerts for walk-in drives.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Free forever. Choose your account type below.</p>
+
+          {/* Role toggle */}
+          <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl border border-border bg-secondary p-1">
+            {([
+              { value: 'candidate', label: 'Job Seeker', icon: Search, sub: 'Find walk-in drives' },
+              { value: 'recruiter', label: 'Recruiter / HR', icon: Briefcase, sub: 'Post & manage drives' },
+            ] as const).map(({ value, label, icon: Icon, sub }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setRole(value)}
+                className={`flex flex-col items-center gap-0.5 rounded-xl py-3 px-2 text-center transition-all ${
+                  role === value
+                    ? 'bg-card shadow-sm border border-border text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Icon className={`h-4 w-4 mb-0.5 ${role === value ? 'text-brand-blue' : ''}`} />
+                <span className="text-xs font-semibold">{label}</span>
+                <span className="text-[10px] text-muted-foreground">{sub}</span>
+              </button>
+            ))}
+          </div>
 
           <button
             onClick={handleGoogle}

@@ -7,6 +7,7 @@ import { auth, db, isConfigured } from '@/lib/firebase'
 interface AuthContextType {
   user: User | null
   isAdmin: boolean
+  isRecruiter: boolean
   loading: boolean
   signOut: () => Promise<void>
 }
@@ -14,34 +15,42 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isAdmin: false,
+  isRecruiter: false,
   loading: true,
   signOut: async () => {},
 })
 
-async function fetchIsAdmin(userId: string): Promise<boolean> {
-  if (!isConfigured) return false
+async function fetchUserRole(userId: string): Promise<{ isAdmin: boolean; isRecruiter: boolean }> {
+  if (!isConfigured) return { isAdmin: false, isRecruiter: false }
   try {
     const snap = await getDoc(doc(db, 'users', userId))
-    return snap.exists() && snap.data()?.is_admin === true
-  } catch (err) {
-    console.error('[fetchIsAdmin] error:', err)
-    return false
+    if (!snap.exists()) return { isAdmin: false, isRecruiter: false }
+    const data = snap.data()
+    return {
+      isAdmin:     data?.is_admin === true,
+      isRecruiter: data?.role === 'recruiter' || data?.is_admin === true,
+    }
+  } catch {
+    return { isAdmin: false, isRecruiter: false }
   }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser]       = useState<User | null>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser]             = useState<User | null>(null)
+  const [isAdmin, setIsAdmin]       = useState(false)
+  const [isRecruiter, setIsRecruiter] = useState(false)
+  const [loading, setLoading]       = useState(true)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u)
       if (u) {
-        const admin = await fetchIsAdmin(u.uid)
-        setIsAdmin(admin)
+        const { isAdmin, isRecruiter } = await fetchUserRole(u.uid)
+        setIsAdmin(isAdmin)
+        setIsRecruiter(isRecruiter)
       } else {
         setIsAdmin(false)
+        setIsRecruiter(false)
       }
       setLoading(false)
     })
@@ -52,10 +61,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await firebaseSignOut(auth)
     setUser(null)
     setIsAdmin(false)
+    setIsRecruiter(false)
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, signOut }}>
+    <AuthContext.Provider value={{ user, isAdmin, isRecruiter, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   )

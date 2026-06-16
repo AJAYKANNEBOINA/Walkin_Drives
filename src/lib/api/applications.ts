@@ -69,13 +69,24 @@ export async function fetchUserApplications(userId: string): Promise<Application
   return applications
 }
 
-export async function applyToDrive(driveId: string, userId: string): Promise<void> {
+export interface ApplyDetails {
+  name:       string
+  email:      string
+  phone:      string
+  experience: string
+}
+
+export async function applyToDrive(driveId: string, userId: string, details?: ApplyDetails): Promise<void> {
   if (!isConfigured) return
   await addDoc(collection(db, 'applications'), {
-    drive_id:   driveId,
-    user_id:    userId,
-    status:     'applied',
-    applied_at: new Date().toISOString(),
+    drive_id:             driveId,
+    user_id:              userId,
+    status:               'applied',
+    applied_at:           new Date().toISOString(),
+    applicant_name:       details?.name       ?? '',
+    applicant_email:      details?.email      ?? '',
+    applicant_phone:      details?.phone      ?? '',
+    applicant_experience: details?.experience ?? '',
   })
 }
 
