@@ -15,6 +15,7 @@ import NotFound       from '@/pages/NotFound'
 import VerifyEmail    from '@/pages/VerifyEmail'
 import AdminDashboard from '@/pages/AdminDashboard'
 import JobAlerts      from '@/pages/JobAlerts'
+import RoleSetup     from '@/pages/RoleSetup'
 
 const queryClient = new QueryClient()
 
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="/admin"        element={<AdminDashboard />} />
             <Route path="/job-alerts"   element={<JobAlerts />} />
             <Route path="/profile"      element={<Profile />} />
+            <Route path="/setup-role"    element={<RoleSetup />} />
             <Route path="*"             element={<NotFound />} />
           </Routes>
         </BrowserRouter>

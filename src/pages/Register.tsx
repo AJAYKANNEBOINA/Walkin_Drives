@@ -51,7 +51,6 @@ export default function Register() {
   const handleGoogle = async () => {
     try {
       const { user } = await signInWithPopup(auth, googleProvider)
-      // Create profile doc if first time
       const profileRef = doc(db, 'users', user.uid)
       await setDoc(profileRef, {
         email:      user.email ?? '',
@@ -60,7 +59,8 @@ export default function Register() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, { merge: true })
-      navigate('/dashboard')
+      // Always send Google users to role setup (role not yet set)
+      navigate('/setup-role')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Google sign up failed.')
     }

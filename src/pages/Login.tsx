@@ -43,8 +43,13 @@ export default function Login() {
 
   const handleGoogle = async () => {
     try {
-      await signInWithPopup(auth, googleProvider)
-      navigate('/dashboard')
+      const { user } = await signInWithPopup(auth, googleProvider)
+      // Check if this user has a role set
+      const { getDoc, doc } = await import('firebase/firestore')
+      const { db } = await import('@/lib/firebase')
+      const snap = await getDoc(doc(db, 'users', user.uid))
+      const hasRole = snap.exists() && !!snap.data()?.role
+      navigate(hasRole ? '/dashboard' : '/setup-role')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Google sign in failed.')
     }
