@@ -12,6 +12,8 @@ import { StatusBadge } from '@/components/ui/Badge'
 import { CompanyLogo } from '@/components/ui/CompanyLogo'
 import { useAuth } from '@/context/AuthContext'
 import { useApplications } from '@/hooks/useApplications'
+import { useQuery } from '@tanstack/react-query'
+import { fetchProfile } from '@/lib/api/profiles'
 import {
   useAdminDrives, useAdminStats,
   useApproveDrive, useRejectDrive, useDeleteDrive,
@@ -25,6 +27,23 @@ export default function Dashboard() {
 
   // User data
   const { data: applications = [] } = useApplications(user?.uid)
+  const { data: profile } = useQuery({
+    queryKey: ['profile', user?.uid],
+    queryFn: () => fetchProfile(user!.uid),
+    enabled: !!user && !isAdmin,
+  })
+
+  const profilePct = (() => {
+    if (!profile) return 20
+    const fields = [
+      (profile as any).full_name,
+      (profile as any).phone,
+      (profile as any).city,
+      (profile as any).experience,
+    ]
+    const filled = fields.filter(Boolean).length
+    return Math.round(((filled + 1) / 5) * 100)
+  })()
 
   // Admin data
   const { data: pendingDrives = [], isLoading: pendingLoading } = useAdminDrives('pending',  isAdmin)
@@ -89,10 +108,10 @@ export default function Dashboard() {
                 {!isAdmin && (
                   <div className="mt-4">
                     <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-                      <span>Profile complete</span><span className="font-semibold text-foreground">65%</span>
+                      <span>Profile complete</span><span className="font-semibold text-foreground">{profilePct}%</span>
                     </div>
                     <div className="h-1.5 w-full rounded-full bg-secondary">
-                      <div className="h-1.5 w-[65%] rounded-full bg-brand-blue" />
+                      <div className="h-1.5 rounded-full bg-brand-blue transition-all duration-500" style={{ width: `${profilePct}%` }} />
                     </div>
                     <Link to="/profile" className="mt-4 block rounded-full border border-border py-2 text-xs font-medium text-foreground hover:bg-secondary transition-colors">
                       Complete Profile
