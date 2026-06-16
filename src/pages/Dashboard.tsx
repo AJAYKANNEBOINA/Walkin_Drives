@@ -177,13 +177,17 @@ export default function Dashboard() {
                 ) : (
                   /* User nav */
                   <>
-                    {[
-                      { icon: LayoutDashboard, label: 'Dashboard',      to: '/dashboard'  },
-                      ...(isRecruiter ? [{ icon: Briefcase, label: 'My Drives', to: '/dashboard' }] : []),
-                      { icon: Bell,            label: 'Job Alerts',     to: '/job-alerts' },
-                      { icon: User,            label: 'My Profile',     to: '/profile'    },
-                      { icon: FileText,        label: 'Blog',           to: '/blogs'      },
-                    ].map(({ icon: Icon, label, to }) => (
+                    {(isRecruiter ? [
+                      { icon: LayoutDashboard, label: 'Dashboard',  to: '/dashboard'  },
+                      { icon: Briefcase,       label: 'My Drives',  to: '/dashboard'  },
+                      { icon: FileText,        label: 'Post Drive', to: '/post-drive' },
+                      { icon: User,            label: 'My Profile', to: '/profile'    },
+                    ] : [
+                      { icon: LayoutDashboard, label: 'Dashboard',  to: '/dashboard'  },
+                      { icon: Bell,            label: 'Job Alerts', to: '/job-alerts' },
+                      { icon: User,            label: 'My Profile', to: '/profile'    },
+                      { icon: FileText,        label: 'Blog',       to: '/blogs'      },
+                    ]).map(({ icon: Icon, label, to }) => (
                       <Link
                         key={label}
                         to={to}
@@ -228,16 +232,26 @@ export default function Dashboard() {
                         <span className="text-emerald-400 font-semibold">{adminStats?.approved ?? 0} approved</span> ·{' '}
                         <span className="text-white/40">{adminStats?.total ?? 0} total</span>
                       </>
+                    ) : isRecruiter ? (
+                      <><span className="text-brand-yellow font-semibold">{recruiterDrives.length} drive(s)</span> posted · manage applicants below.</>
                     ) : (
                       <>You have <span className="text-brand-yellow font-semibold">{applications.filter((a) => a.status === 'shortlisted').length} shortlisted</span> application(s) waiting.</>
                     )}
                   </p>
-                  {!isAdmin && (
+                  {!isAdmin && !isRecruiter && (
                     <Link
                       to="/drives"
                       className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 backdrop-blur px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
                     >
                       Browse new drives <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  )}
+                  {isRecruiter && !isAdmin && (
+                    <Link
+                      to="/post-drive"
+                      className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 backdrop-blur px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+                    >
+                      Post a Drive <ArrowRight className="h-4 w-4" />
                     </Link>
                   )}
                 </div>
@@ -448,8 +462,8 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* ════════════ USER VIEW ════════════ */}
-              {!isAdmin && (
+              {/* ════════════ USER VIEW (candidates only) ════════════ */}
+              {!isAdmin && !isRecruiter && (
                 <>
                   {/* Stats */}
                   <div className="grid grid-cols-2 gap-3">
