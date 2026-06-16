@@ -94,25 +94,3 @@ export async function updateApplicantStatus(
   }
 }
 
-export async function notifyHROnApplication(
-  contactEmail: string,
-  applicantName: string,
-  role: string,
-  companyName: string
-): Promise<void> {
-  try {
-    await emailjs.send(
-      import.meta.env.VITE_EMAILJS_SERVICE_ID,
-      import.meta.env.VITE_EMAILJS_HR_NOTIFY_TEMPLATE_ID,
-      {
-        to_email:       contactEmail,
-        applicant_name: applicantName,
-        role,
-        company_name:   companyName,
-      },
-      import.meta.env.VITE_EMAILJS_PUBLIC_KEY
-    )
-  } catch {
-    // Non-blocking — don't fail apply if email fails
-  }
-}
