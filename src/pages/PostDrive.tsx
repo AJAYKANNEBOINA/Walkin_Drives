@@ -51,8 +51,9 @@ export default function PostDrive() {
         description:  extracted.description  || f.description,
         skills:       extracted.skills       || f.skills,
       }))
-    } catch {
-      setExtractError('Could not read the image. Please fill the form manually.')
+    } catch (err) {
+      console.error('[Gemini extract error]', err)
+      setExtractError(err instanceof Error ? err.message : 'Could not read the image. Please fill the form manually.')
     } finally {
       setExtracting(false)
     }

@@ -20,12 +20,17 @@ export interface ExtractedDrive {
 }
 
 export async function extractDriveFromImage(file: File): Promise<Partial<ExtractedDrive>> {
+  if (!API_KEY) throw new Error('Gemini API key not configured')
+
   const genAI = new GoogleGenerativeAI(API_KEY)
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
   const base64 = await fileToBase64(file)
 
-  const prompt = `You are extracting walk-in drive/job interview details from this image poster.
+  // Ensure mime type is valid for Gemini
+  const mimeType = file.type || 'image/jpeg'
+
+  const prompt = `Extract walk-in drive/job interview details from this image poster.
 Return ONLY a valid JSON object with these exact keys (use empty string "" if not found):
 {
   "company": "company name",
@@ -43,15 +48,28 @@ Return ONLY a valid JSON object with these exact keys (use empty string "" if no
   "description": "brief job description if visible",
   "skills": "required skills comma separated"
 }
-Return only the JSON, no markdown, no explanation.`
+Return ONLY the JSON object. No markdown, no code blocks, no explanation.`
 
   const result = await model.generateContent([
-    prompt,
-    { inlineData: { mimeType: file.type as any, data: base64 } },
+    { text: prompt },
+    { inlineData: { mimeType, data: base64 } },
   ])
 
   const text = result.response.text().trim()
-  const json = text.startsWith('{') ? text : text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)
+  console.log('[Gemini raw response]', text)
+
+  // Strip markdown code blocks if present (```json ... ``` or ``` ... ```)
+  const cleaned = text
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim()
+
+  const start = cleaned.indexOf('{')
+  const end   = cleaned.lastIndexOf('}')
+  if (start === -1 || end === -1) throw new Error('No JSON found in Gemini response: ' + cleaned)
+
+  const json = cleaned.slice(start, end + 1)
   return JSON.parse(json) as Partial<ExtractedDrive>
 }
 
