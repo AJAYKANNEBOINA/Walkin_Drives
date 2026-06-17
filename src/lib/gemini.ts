@@ -56,9 +56,15 @@ Return ONLY the JSON object. No markdown, no code blocks, no explanation.`
     generationConfig: { temperature: 0.1 }
   }
 
-  const res = await fetch(`${BASE_URL}?key=${API_KEY}`, {
+  // AQ. keys use Bearer token auth; AIzaSy keys use ?key= query param
+  const isBearer = API_KEY.startsWith('AQ.')
+  const url = isBearer ? BASE_URL : `${BASE_URL}?key=${API_KEY}`
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (isBearer) headers['Authorization'] = `Bearer ${API_KEY}`
+
+  const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   })
 
