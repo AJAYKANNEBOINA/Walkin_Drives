@@ -23,7 +23,7 @@ export async function extractDriveFromImage(file: File): Promise<Partial<Extract
   if (!API_KEY) throw new Error('Gemini API key not configured')
 
   const genAI = new GoogleGenerativeAI(API_KEY)
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' })
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
   const base64 = await fileToBase64(file)
 
