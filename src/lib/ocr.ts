@@ -1,4 +1,5 @@
-import Tesseract from 'tesseract.js'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const Tesseract: any
 
 export interface ExtractedDrive {
   company: string
@@ -22,7 +23,7 @@ export async function extractDriveFromImage(
   onProgress?: (pct: number) => void
 ): Promise<Partial<ExtractedDrive>> {
   const result = await Tesseract.recognize(file, 'eng', {
-    logger: (m) => {
+    logger: (m: { status: string; progress: number }) => {
       if (m.status === 'recognizing text' && onProgress) {
         onProgress(Math.round(m.progress * 100))
       }
