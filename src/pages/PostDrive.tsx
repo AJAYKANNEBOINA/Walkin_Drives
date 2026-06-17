@@ -14,6 +14,7 @@ export default function PostDrive() {
   const postDriveMutation = usePostDrive()
   const [submitted, setSubmitted] = useState(false)
   const [extracting, setExtracting] = useState(false)
+  const [extractSuccess, setExtractSuccess] = useState(false)
   const [extractError, setExtractError] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -31,9 +32,11 @@ export default function PostDrive() {
     if (!file) return
     setPreviewUrl(URL.createObjectURL(file))
     setExtractError('')
+    setExtractSuccess(false)
     setExtracting(true)
     try {
       const extracted = await extractDriveFromImage(file)
+      setExtractSuccess(true)
       setForm(f => ({
         ...f,
         company:      extracted.company      || f.company,
@@ -160,19 +163,27 @@ export default function PostDrive() {
                         <div className="flex items-center gap-2 text-xs text-brand-blue font-medium">
                           <Loader2 className="h-4 w-4 animate-spin" /> Extracting details…
                         </div>
-                      ) : (
+                      ) : extractSuccess ? (
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-medium text-emerald-600 flex items-center gap-1">
                             <CheckCircle2 className="h-3.5 w-3.5" /> Fields filled — review below
                           </span>
                           <button
                             type="button"
-                            onClick={() => { setPreviewUrl(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                            onClick={() => { setPreviewUrl(null); setExtractSuccess(false); if (fileInputRef.current) fileInputRef.current.value = '' }}
                             className="grid h-6 w-6 place-items-center rounded-full border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors"
                           >
                             <X className="h-3 w-3" />
                           </button>
                         </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => { setPreviewUrl(null); setExtractError(''); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                          className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+                        >
+                          <X className="h-3 w-3" /> Remove & try again
+                        </button>
                       )}
                     </div>
                   )}
