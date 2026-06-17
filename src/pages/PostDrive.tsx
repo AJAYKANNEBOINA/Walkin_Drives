@@ -1,24 +1,17 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { MapPin, Calendar, Clock, Users, CheckCircle2, ArrowRight, Briefcase, Sparkles, Upload, X, Loader2 } from 'lucide-react'
+import { MapPin, Calendar, Clock, Users, CheckCircle2, ArrowRight, Briefcase } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { Input } from '@/components/ui/Input'
 import { CITIES, EXPERIENCES, MODES } from '@/lib/mockData'
 import { usePostDrive } from '@/hooks/useDrives'
 import { useAuth } from '@/context/AuthContext'
-import { extractDriveFromImage } from '@/lib/ocr'
 
 export default function PostDrive() {
   const { user } = useAuth()
   const postDriveMutation = usePostDrive()
   const [submitted, setSubmitted] = useState(false)
-  const [extracting, setExtracting] = useState(false)
-  const [extractProgress, setExtractProgress] = useState(0)
-  const [extractSuccess, setExtractSuccess] = useState(false)
-  const [extractError, setExtractError] = useState('')
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
     company: '', contactEmail: '', role: '', location: '', city: '',
     experience: '', eligibility: '', salary: '', mode: 'Onsite' as const,
@@ -27,42 +20,6 @@ export default function PostDrive() {
 
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }))
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setPreviewUrl(URL.createObjectURL(file))
-    setExtractError('')
-    setExtractSuccess(false)
-    setExtractProgress(0)
-    setExtracting(true)
-    try {
-      const extracted = await extractDriveFromImage(file, setExtractProgress)
-      setExtractSuccess(true)
-      setForm(f => ({
-        ...f,
-        company:      extracted.company      || f.company,
-        contactEmail: extracted.contactEmail || f.contactEmail,
-        role:         extracted.role         || f.role,
-        location:     extracted.location     || f.location,
-        city:         extracted.city         || f.city,
-        experience:   extracted.experience   || f.experience,
-        eligibility:  extracted.eligibility  || f.eligibility,
-        salary:       extracted.salary       || f.salary,
-        mode:         (extracted.mode as typeof f.mode) || f.mode,
-        driveDate:    extracted.driveDate    || f.driveDate,
-        driveTime:    extracted.driveTime    || f.driveTime,
-        openings:     extracted.openings     || f.openings,
-        description:  extracted.description  || f.description,
-        skills:       extracted.skills       || f.skills,
-      }))
-    } catch (err) {
-      console.error('[OCR extract error]', err)
-      setExtractError(err instanceof Error ? err.message : 'Could not read the image. Please fill the form manually.')
-    } finally {
-      setExtracting(false)
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -139,70 +96,6 @@ export default function PostDrive() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-
-            {/* ── AI Image Extract ── */}
-            <div className="rounded-2xl border-2 border-dashed border-brand-blue/40 bg-brand-blue/5 p-6">
-              <div className="flex items-start gap-4">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[oklch(0.62_0.22_260)] to-[oklch(0.55_0.22_260)] text-white shadow-[0_8px_20px_-8px_oklch(0.62_0.22_260/0.5)]">
-                  <Sparkles className="h-5 w-5" />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground text-sm">Auto-fill with AI</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Upload a walk-in drive poster image — Gemini AI will extract all details automatically.</p>
-
-                  {!previewUrl ? (
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="mt-3 inline-flex items-center gap-2 rounded-full border border-brand-blue/40 bg-white px-4 py-2 text-xs font-semibold text-brand-blue hover:bg-brand-blue/10 transition-colors"
-                    >
-                      <Upload className="h-3.5 w-3.5" /> Upload Drive Poster
-                    </button>
-                  ) : (
-                    <div className="mt-3 flex items-center gap-3">
-                      <img src={previewUrl} alt="Drive poster" className="h-16 w-16 rounded-lg object-cover border border-border" />
-                      {extracting ? (
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2 text-xs text-brand-blue font-medium">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            {extractProgress > 0 ? `Reading image… ${extractProgress}%` : 'Loading OCR engine…'}
-                          </div>
-                          {extractProgress > 0 && (
-                            <div className="h-1 w-40 rounded-full bg-border overflow-hidden">
-                              <div className="h-full bg-brand-blue rounded-full transition-all" style={{ width: `${extractProgress}%` }} />
-                            </div>
-                          )}
-                        </div>
-                      ) : extractSuccess ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-emerald-600 flex items-center gap-1">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> Fields filled — review below
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => { setPreviewUrl(null); setExtractSuccess(false); if (fileInputRef.current) fileInputRef.current.value = '' }}
-                            className="grid h-6 w-6 place-items-center rounded-full border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => { setPreviewUrl(null); setExtractError(''); if (fileInputRef.current) fileInputRef.current.value = '' }}
-                          className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
-                        >
-                          <X className="h-3 w-3" /> Remove & try again
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {extractError && <p className="mt-2 text-xs text-destructive">{extractError}</p>}
-                </div>
-              </div>
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-            </div>
 
             <Section icon={<Briefcase className="h-5 w-5" />} title="Company Information">
               <div className="grid sm:grid-cols-2 gap-4">
