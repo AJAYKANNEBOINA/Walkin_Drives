@@ -7,13 +7,14 @@ import { Input } from '@/components/ui/Input'
 import { CITIES, EXPERIENCES, MODES } from '@/lib/mockData'
 import { usePostDrive } from '@/hooks/useDrives'
 import { useAuth } from '@/context/AuthContext'
-import { extractDriveFromImage } from '@/lib/gemini'
+import { extractDriveFromImage } from '@/lib/ocr'
 
 export default function PostDrive() {
   const { user } = useAuth()
   const postDriveMutation = usePostDrive()
   const [submitted, setSubmitted] = useState(false)
   const [extracting, setExtracting] = useState(false)
+  const [extractProgress, setExtractProgress] = useState(0)
   const [extractSuccess, setExtractSuccess] = useState(false)
   const [extractError, setExtractError] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -33,9 +34,10 @@ export default function PostDrive() {
     setPreviewUrl(URL.createObjectURL(file))
     setExtractError('')
     setExtractSuccess(false)
+    setExtractProgress(0)
     setExtracting(true)
     try {
-      const extracted = await extractDriveFromImage(file)
+      const extracted = await extractDriveFromImage(file, setExtractProgress)
       setExtractSuccess(true)
       setForm(f => ({
         ...f,
@@ -55,7 +57,7 @@ export default function PostDrive() {
         skills:       extracted.skills       || f.skills,
       }))
     } catch (err) {
-      console.error('[Gemini extract error]', err)
+      console.error('[OCR extract error]', err)
       setExtractError(err instanceof Error ? err.message : 'Could not read the image. Please fill the form manually.')
     } finally {
       setExtracting(false)
@@ -160,8 +162,16 @@ export default function PostDrive() {
                     <div className="mt-3 flex items-center gap-3">
                       <img src={previewUrl} alt="Drive poster" className="h-16 w-16 rounded-lg object-cover border border-border" />
                       {extracting ? (
-                        <div className="flex items-center gap-2 text-xs text-brand-blue font-medium">
-                          <Loader2 className="h-4 w-4 animate-spin" /> Extracting details…
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 text-xs text-brand-blue font-medium">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            {extractProgress > 0 ? `Reading image… ${extractProgress}%` : 'Loading OCR engine…'}
+                          </div>
+                          {extractProgress > 0 && (
+                            <div className="h-1 w-40 rounded-full bg-border overflow-hidden">
+                              <div className="h-full bg-brand-blue rounded-full transition-all" style={{ width: `${extractProgress}%` }} />
+                            </div>
+                          )}
                         </div>
                       ) : extractSuccess ? (
                         <div className="flex items-center gap-2">
